@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.workwave.workwave">
+
+
+    <application
+        android:label="WorkWave"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.WorkWave">
+
+
+        <activity android:name=".ui.ProfileActivity"
+            android:exported="false"/>
+
+        <activity android:name=".ui.SettingsActivity"
+            android:exported="false"/>
+
+        <activity
+            android:name=".ui.CalendarActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.EmployeesActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.HomeActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.LoginActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.RegisterActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>

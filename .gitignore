@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+**/build/
+!gradle/wrapper/
+!gradlew
+!gradlew.bat
+
+# Local configuration
+local.properties
+
+# IntelliJ/Android Studio
+*.iml
+.idea/
+!.idea/codeStyles/
+
+
+# NDK/External builds
+.cxx/
+externalNativeBuild/
+
+# Logs, misc
+*.log
+.DS_Store
+captures/
+
+# Keystores (подписи не храним в репозитории)
+*.jks
+*.keystore
+*.keystore.properties
+
+# APK/AAB (собранные артефакты)
+*.apk
+*.aab

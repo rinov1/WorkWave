@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <TextView
+        android:text="WorkWave"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOpenLogin"
+        android:text="вход"
+        android:textColor="@android:color/black"
+        android:background="@drawable/bg_btn_white_15dp"
+        app:backgroundTint="@null"
+        android:layout_width="300dp"
+        android:layout_height="wrap_content"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOpenRegister"
+        style="@style/WorkWave.BlueRoundedButton"
+        android:text="регистрация"
+        android:layout_marginTop="12dp"
+        android:layout_width="300dp"
+        android:layout_height="wrap_content"/>
+</LinearLayout>
