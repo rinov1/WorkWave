@@ -17,8 +17,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import com.workwave.workwave.R
 import com.workwave.workwave.data.AppDatabase
 import com.workwave.workwave.data.EmployeeEntity
@@ -28,6 +31,7 @@ import com.workwave.workwave.data.WorkSessionEntity
 import com.workwave.workwave.databinding.ActivityHomeBinding
 import com.workwave.workwave.databinding.ItemEmployeeBinding
 import com.workwave.workwave.databinding.ItemSessionBinding
+import com.workwave.workwave.firebase.FirebaseEmployees
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -46,41 +50,36 @@ class HomeActivity : AppCompatActivity() {
     private var openSession: WorkSessionEntity? = null
     private var pendingAction: Action? = null
 
-    private var calendarInit = false
-    private var employeesInit = false
+    // флаг "режим удаления сотрудника"
+    private var isDeleteMode: Boolean = false
+
+    // календарь — свод по сотрудникам за день
     private val sessionsAdapter = SessionsAdapter()
     private lateinit var employeesAdapter: EmployeesAdapter
 
+    // все сотрудники, которые сейчас в списке (из Firestore)
+    private var allEmployees: List<UserWithNames> = emptyList()
+
     private enum class Action { START, FINISH }
 
+    // launcher профиля
     private val profileLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == RESULT_OK && employeesInit) {
-                lifecycleScope.launch { refreshEmployeesList() }
-            }
-        }
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { /* no-op */ }
 
+    // Permission-на-запрос камеры
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
-                when (pendingAction) {
-                    Action.START, Action.FINISH -> launchQrScanner()
-                    else -> {}
-                }
+                launchQrScanner()
             } else {
-                Snackbar.make(binding.root, "Дайте доступ к камере для сканирования QR", Snackbar.LENGTH_LONG).show()
+                Snackbar.make(
+                    binding.root,
+                    "Дайте доступ к камере для сканирования QR",
+                    Snackbar.LENGTH_LONG
+                ).show()
+                pendingAction = null
             }
         }
-
-    private val qrScannerLauncher = registerForActivityResult(ScanContract()) { result ->
-        val contents = result.contents ?: return@registerForActivityResult
-        when (pendingAction) {
-            Action.START -> lifecycleScope.launch { startWorkAfterScan(contents) }
-            Action.FINISH -> lifecycleScope.launch { finishWorkAfterScan(contents) }
-            else -> {}
-        }
-        pendingAction = null
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,9 +108,20 @@ class HomeActivity : AppCompatActivity() {
             } else false
         }
 
+        // слушаем список сотрудников из Firestore
+        FirebaseEmployees.listenEmployees { list ->
+            allEmployees = list
+            if (::employeesAdapter.isInitialized) {
+                employeesAdapter.submitList(list)
+            }
+            sessionsAdapter.updateUsers(list.associateBy { it.userId })
+        }
+
+        // шапка недели и дата
         setupWeekStrip()
         setupTodayTexts()
 
+        // старт и стоп смены
         binding.btnStart.setOnClickListener {
             pendingAction = Action.START
             ensureCameraPermThenScan()
@@ -124,9 +134,9 @@ class HomeActivity : AppCompatActivity() {
         binding.bottomNav.selectedItemId = R.id.nav_home
         binding.bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
-                R.id.nav_home -> { showHomeTab(); true }
+                R.id.nav_home     -> { showHomeTab(); true }
                 R.id.nav_calendar -> { showCalendarTab(); true }
-                R.id.nav_people -> { showEmployeesTab(); true }
+                R.id.nav_people   -> { showEmployeesTab(); true }
                 else -> false
             }
         }
@@ -134,7 +144,6 @@ class HomeActivity : AppCompatActivity() {
 
         lifecycleScope.launch { loadOpenSessionAndRender() }
     }
-
 
     private fun showHomeTab() {
         binding.toolbar.title = "WorkWave"
@@ -148,7 +157,7 @@ class HomeActivity : AppCompatActivity() {
         binding.homeContent.visibility = View.GONE
         binding.incCalendar.root.visibility = View.VISIBLE
         binding.incEmployees.root.visibility = View.GONE
-        if (!calendarInit) initCalendarSection()
+        if (binding.incCalendar.rvSessions.adapter == null) initCalendarSection()
     }
 
     private fun showEmployeesTab() {
@@ -156,9 +165,8 @@ class HomeActivity : AppCompatActivity() {
         binding.homeContent.visibility = View.GONE
         binding.incCalendar.root.visibility = View.GONE
         binding.incEmployees.root.visibility = View.VISIBLE
-        if (!employeesInit) initEmployeesSection()
+        if (binding.incEmployees.rvEmployees.adapter == null) initEmployeesSection()
     }
-
 
     private fun initCalendarSection() {
         binding.incCalendar.rvSessions.layoutManager = LinearLayoutManager(this)
@@ -174,120 +182,209 @@ class HomeActivity : AppCompatActivity() {
                 set(y, m, d, 0, 0, 0)
                 set(Calendar.MILLISECOND, 0)
             }
-            val millis = cal.timeInMillis
-            updateSelectedDateText(millis)
-            loadSessionsForDay(millis)
+            updateSelectedDateText(cal.timeInMillis)
+            loadSessionsForDay(cal.timeInMillis)
         }
-        calendarInit = true
     }
 
     private fun initEmployeesSection() {
-        binding.incEmployees.hrActionsBar.visibility = if (isHr) View.VISIBLE else View.GONE
-
-        binding.incEmployees.btnAddEmployee.setOnClickListener {
-            lifecycleScope.launch { showAddEmployeeDialog() }
-        }
-        binding.incEmployees.btnDeleteEmployee.setOnClickListener {
-            lifecycleScope.launch { showDeleteEmployeeDialog() }
-        }
-
         employeesAdapter = EmployeesAdapter(
-            isHr = isHr,
-            onClick = { user -> openEmployee(user.userId) },
-            onLongDelete = { user ->
-                if (!isHr) return@EmployeesAdapter
-                confirmDeleteEmployee(user)
-            }
+            onClick = { user -> onEmployeeClicked(user) }
         )
         binding.incEmployees.rvEmployees.layoutManager = LinearLayoutManager(this)
         binding.incEmployees.rvEmployees.adapter = employeesAdapter
 
-        lifecycleScope.launch { refreshEmployeesList() }
-        employeesInit = true
+        if (allEmployees.isNotEmpty()) {
+            employeesAdapter.submitList(allEmployees)
+        }
+
+        setupEmployeesButtons()
     }
 
-    private suspend fun refreshEmployeesList() {
-        val list = withContext(Dispatchers.IO) {
-            AppDatabase.get(this@HomeActivity).userDao().getActiveEmployeesWithNames()
+    /** кнопки "Добавить" и "Удалить" сверху списка сотрудников */
+    private fun setupEmployeesButtons() {
+        val addBtn = binding.incEmployees.btnAddEmployee
+        val delBtn = binding.incEmployees.btnDeleteEmployee
+
+        if (!isHr) {
+            addBtn.visibility = View.GONE
+            delBtn.visibility = View.GONE
+        } else {
+            addBtn.visibility = View.VISIBLE
+            delBtn.visibility = View.VISIBLE
+
+            addBtn.setOnClickListener { showAddEmployeeDialog() }
+            delBtn.setOnClickListener { toggleDeleteMode() }
         }
-        employeesAdapter.submitList(list)
     }
 
-    private fun openEmployee(targetUserId: Long) {
-        val intent = Intent(this, ProfileActivity::class.java)
-            .putExtra("userId", targetUserId)
-            .putExtra("editable", isHr)
-            .putExtra("hrMode", isHr)
-        profileLauncher.launch(intent)
+    /** клик по сотруднику в списке */
+    private fun onEmployeeClicked(user: UserWithNames) {
+        if (isHr && isDeleteMode) {
+            confirmDeleteEmployee(user)
+        } else {
+            openEmployee(user.userId)
+        }
     }
 
-    private suspend fun showAddEmployeeDialog() {
-        val users = withContext(Dispatchers.IO) {
-            AppDatabase.get(this@HomeActivity).userDao().getUsersNotInEmployees()
+    /** включение / выключение режима удаления */
+    private fun toggleDeleteMode() {
+        if (!isHr) return
+        isDeleteMode = !isDeleteMode
+        val btn = binding.incEmployees.btnDeleteEmployee
+        btn.text = if (isDeleteMode) "Отменить удаление" else "Удалить"
+        val msg = if (isDeleteMode) {
+            "Нажмите на сотрудника, которого хотите удалить"
+        } else {
+            "Режим удаления выключен"
         }
-        if (users.isEmpty()) {
-            Snackbar.make(binding.root, "Нет пользователей для добавления", Snackbar.LENGTH_SHORT).show()
-            return
-        }
-        val labels = users.map { u ->
-            val name = listOfNotNull(u.firstName, u.lastName).joinToString(" ").trim()
-            if (name.isNotEmpty()) "$name (${u.email})" else u.email
-        }.toTypedArray()
-
-        AlertDialog.Builder(this)
-            .setTitle("Добавить сотрудника")
-            .setItems(labels) { _, which ->
-                val u = users[which]
-                lifecycleScope.launch {
-                    withContext(Dispatchers.IO) {
-                        AppDatabase.get(this@HomeActivity).employeeDao()
-                            .insertOrUpdate(EmployeeEntity(userId = u.userId, email = u.email))
-                    }
-                    refreshEmployeesList()
-                }
-            }
-            .setNegativeButton("Отмена", null)
-            .show()
+        Snackbar.make(binding.root, msg, Snackbar.LENGTH_SHORT).show()
     }
 
-    private suspend fun showDeleteEmployeeDialog() {
-        val employees = withContext(Dispatchers.IO) {
-            AppDatabase.get(this@HomeActivity).userDao().getActiveEmployeesWithNames()
-        }
-        if (employees.isEmpty()) {
-            Snackbar.make(binding.root, "Список сотрудников пуст", Snackbar.LENGTH_SHORT).show()
-            return
-        }
-        val labels = employees.map { u ->
-            val name = listOfNotNull(u.firstName, u.lastName).joinToString(" ").trim()
-            if (name.isNotEmpty()) "$name (${u.email})" else u.email
-        }.toTypedArray()
-
-        AlertDialog.Builder(this)
-            .setTitle("Удалить сотрудника из списка")
-            .setItems(labels) { _, which ->
-                confirmDeleteEmployee(employees[which])
-            }
-            .setNegativeButton("Отмена", null)
-            .show()
-    }
-
+    /** диалог подтверждения удаления сотрудника */
     private fun confirmDeleteEmployee(user: UserWithNames) {
         AlertDialog.Builder(this)
-            .setTitle("Удалить из списка?")
-            .setMessage(user.email)
+            .setTitle("Удалить сотрудника?")
+            .setMessage("Удалить ${user.email}? Также будут удалены все его смены.")
             .setPositiveButton("Удалить") { _, _ ->
-                lifecycleScope.launch {
-                    withContext(Dispatchers.IO) {
-                        AppDatabase.get(this@HomeActivity).employeeDao().deleteByUserId(user.userId)
-                    }
-                    refreshEmployeesList()
-                }
+                lifecycleScope.launch { deleteEmployee(user) }
             }
             .setNegativeButton("Отмена", null)
             .show()
     }
 
+    /** фактическое удаление сотрудника из Room и Firestore */
+    private suspend fun deleteEmployee(user: UserWithNames) {
+        withContext(Dispatchers.IO) {
+            val db = AppDatabase.get(this@HomeActivity)
+            db.workSessionDao().deleteByUserId(user.userId)
+            db.employeeDao().deleteByUserId(user.userId)
+            db.userDao().deleteById(user.userId)
+        }
+        // Firestore
+        FirebaseEmployees.deleteEmployeeByUserId(user.userId)
+
+        isDeleteMode = false
+        binding.incEmployees.btnDeleteEmployee.text = "Удалить"
+
+        Snackbar.make(binding.root, "Сотрудник удалён", Snackbar.LENGTH_SHORT).show()
+    }
+
+    /**
+     * Кнопка "Добавить": показываем пользователей, которых нет в списке сотрудников,
+     * выбираем одного и добавляем в коллекцию employees (Firestore).
+     */
+    private fun showAddEmployeeDialog() {
+        if (!isHr) return
+
+        val activeIds = allEmployees.map { it.userId }.toSet()
+        val db = Firebase.firestore
+
+        db.collection("users")
+            .get()
+            .addOnSuccessListener { snap ->
+                val candidates = snap.documents.mapNotNull { d ->
+                    val id = d.getLong("userId") ?: return@mapNotNull null
+                    val email = d.getString("email") ?: return@mapNotNull null
+                    val isHrUser = d.getBoolean("isHr") ?: false
+
+                    // пропускаем HR и тех, кто уже в списке сотрудников
+                    if (isHrUser || activeIds.contains(id)) {
+                        null
+                    } else {
+                        SimpleUser(id, email)
+                    }
+                }
+
+                if (candidates.isEmpty()) {
+                    Snackbar.make(binding.root, "Нет сотрудников для добавления", Snackbar.LENGTH_LONG).show()
+                    return@addOnSuccessListener
+                }
+
+                val labels = candidates.map { it.email }.toTypedArray()
+
+                AlertDialog.Builder(this)
+                    .setTitle("Выберите сотрудника для добавления")
+                    .setItems(labels) { _, which ->
+                        val u = candidates[which]
+                        // создаём минимальную карточку сотрудника в Firestore
+                        val emp = EmployeeEntity(
+                            userId = u.userId,
+                            email = u.email
+                        )
+                        FirebaseEmployees.upsertEmployee(emp)
+                        Snackbar.make(binding.root, "Сотрудник добавлен", Snackbar.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Отмена", null)
+                    .show()
+            }
+            .addOnFailureListener { e ->
+                Snackbar.make(
+                    binding.root,
+                    "Ошибка загрузки списка пользователей: ${e.localizedMessage ?: "неизвестная"}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+    }
+
+    /**
+     * Открытие профиля сотрудника.
+     *
+     * - HR может редактировать любого.
+     * - Обычный сотрудник может редактировать только себя.
+     */
+    private fun openEmployee(targetUserId: Long) {
+        val canEdit = isHr || (targetUserId == userId)
+
+        profileLauncher.launch(
+            Intent(this, ProfileActivity::class.java)
+                .putExtra("userId", targetUserId)
+                .putExtra("editable", canEdit)
+                .putExtra("hrMode", isHr)
+        )
+    }
+
+    // ————— ШАПКА НЕДЕЛИ И ДАТА —————
+
+    private fun setupWeekStrip() {
+        val ru = Locale("ru", "RU")
+
+        binding.tvMonth.text = SimpleDateFormat("LLLL", ru).format(Date()).lowercase(ru)
+
+        val tvs: List<TextView> = listOf(
+            binding.tvN1, binding.tvN2, binding.tvN3, binding.tvN4,
+            binding.tvN5, binding.tvN6, binding.tvN7
+        )
+
+        val cal = Calendar.getInstance().apply { firstDayOfWeek = Calendar.MONDAY }
+        val today = cal.clone() as Calendar
+        val dayOfWeek = ((today.get(Calendar.DAY_OF_WEEK) + 5) % 7)
+
+        val monday = cal.clone() as Calendar
+        monday.add(Calendar.DAY_OF_MONTH, -dayOfWeek)
+
+        tvs.forEachIndexed { i, tv ->
+            val d = monday.clone() as Calendar
+            d.add(Calendar.DAY_OF_MONTH, i)
+            tv.text = d.get(Calendar.DAY_OF_MONTH).toString()
+
+            if (i == dayOfWeek) {
+                tv.setBackgroundResource(R.drawable.bg_today)
+                tv.setTextColor(getColor(android.R.color.white))
+            } else {
+                tv.background = null
+                tv.setTextColor(getColor(android.R.color.black))
+            }
+        }
+    }
+
+    private fun setupTodayTexts() {
+        val ru = Locale("ru", "RU")
+        val fmt = SimpleDateFormat("EEEE, d MMMM", ru)
+        binding.tvDate.text = fmt.format(Date())
+    }
+
+    // ————————————————————————————————————
 
     private fun updateSelectedDateText(dayMillis: Long) {
         val ru = Locale("ru", "RU")
@@ -314,44 +411,25 @@ class HomeActivity : AppCompatActivity() {
                     .workSessionDao()
                     .sessionsByDay(start, end)
             }
-            val list = if (isHr) sessions else sessions.filter { it.userId == userId }
-            sessionsAdapter.submitList(list)
-            binding.incCalendar.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+
+            val visible = if (isHr) sessions else sessions.filter { it.userId == userId }
+
+            val summaries = visible
+                .filter { it.endTime != null }
+                .groupBy { it.userId to it.userEmail }
+                .map { (key, list) ->
+                    val totalMs = list.sumOf { s -> (s.endTime!! - s.startTime) }
+                    DaySummaryItem(
+                        userId = key.first,
+                        userEmail = key.second,
+                        totalMinutes = TimeUnit.MILLISECONDS.toMinutes(totalMs)
+                    )
+                }
+                .sortedBy { it.userEmail }
+
+            sessionsAdapter.submitList(summaries)
+            binding.incCalendar.tvEmpty.visibility = if (summaries.isEmpty()) View.VISIBLE else View.GONE
         }
-    }
-
-
-    private fun setupWeekStrip() {
-        val ru = Locale("ru", "RU")
-        binding.tvMonth.text = SimpleDateFormat("LLLL", ru).format(Date()).lowercase(ru)
-
-        val tvs: List<TextView> = listOf(
-            binding.tvN1, binding.tvN2, binding.tvN3, binding.tvN4, binding.tvN5, binding.tvN6, binding.tvN7
-        )
-        val cal = Calendar.getInstance().apply { firstDayOfWeek = Calendar.MONDAY }
-        val today = cal.clone() as Calendar
-        val dayOfWeek = ((today.get(Calendar.DAY_OF_WEEK) + 5) % 7)
-        val monday = cal.clone() as Calendar
-        monday.add(Calendar.DAY_OF_MONTH, -dayOfWeek)
-
-        tvs.forEachIndexed { i, tv ->
-            val d = monday.clone() as Calendar
-            d.add(Calendar.DAY_OF_MONTH, i)
-            tv.text = d.get(Calendar.DAY_OF_MONTH).toString()
-            if (i == dayOfWeek) {
-                tv.setBackgroundResource(R.drawable.bg_today)
-                tv.setTextColor(getColor(android.R.color.white))
-            } else {
-                tv.background = null
-                tv.setTextColor(getColor(android.R.color.black))
-            }
-        }
-    }
-
-    private fun setupTodayTexts() {
-        val ru = Locale("ru", "RU")
-        val dateFmt = SimpleDateFormat("EEEE, d MMMM", ru)
-        binding.tvDate.text = dateFmt.format(Date())
     }
 
     private suspend fun loadOpenSessionAndRender() {
@@ -384,46 +462,146 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun launchQrScanner() {
-        val options = ScanOptions()
-            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-            .setPrompt("Наведите камеру на QR")
-            .setBeepEnabled(true)
-            .setOrientationLocked(true)
-        qrScannerLauncher.launch(options)
+        val options = GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .build()
+
+        val scanner = GmsBarcodeScanning.getClient(this, options)
+
+        scanner.startScan()
+            .addOnSuccessListener { barcode ->
+                val contents = barcode.rawValue ?: return@addOnSuccessListener
+                when (pendingAction) {
+                    Action.START -> lifecycleScope.launch { startWorkAfterScan(contents) }
+                    Action.FINISH -> lifecycleScope.launch { finishWorkAfterScan(contents) }
+                    else -> {}
+                }
+                pendingAction = null
+            }
+            .addOnCanceledListener {
+                pendingAction = null
+            }
+            .addOnFailureListener { e ->
+                Snackbar.make(
+                    binding.root,
+                    "Ошибка сканирования: ${e.localizedMessage ?: "неизвестная ошибка"}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+                pendingAction = null
+            }
     }
 
     private suspend fun startWorkAfterScan(qr: String) {
         if (userId <= 0) return
-        val now = System.currentTimeMillis()
+
+        val officeId = parseOfficeId(qr)
+        if (officeId == null) {
+            Snackbar.make(binding.root, "Некорректный QR-код", Snackbar.LENGTH_LONG).show()
+            return
+        }
+
         val dao = AppDatabase.get(this).workSessionDao()
-        val session = WorkSessionEntity(userId = userId, startTime = now, officeId = parseOfficeId(qr))
-        withContext(Dispatchers.IO) { dao.insert(session) }
+
+        val existing = withContext(Dispatchers.IO) {
+            dao.getOpenSessionForUser(userId)
+        }
+        if (existing != null) {
+            openSession = existing
+            Snackbar.make(binding.root, "Смена уже начата", Snackbar.LENGTH_SHORT).show()
+            renderState()
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val session = WorkSessionEntity(
+            userId = userId,
+            startTime = now,
+            officeId = officeId
+        )
+
+        withContext(Dispatchers.IO) {
+            dao.insert(session)
+        }
+
         openSession = session
         Snackbar.make(binding.root, "Смена начата", Snackbar.LENGTH_SHORT).show()
         renderState()
     }
 
     private suspend fun finishWorkAfterScan(qr: String) {
+        if (userId <= 0) return
+
+        val officeId = parseOfficeId(qr)
+        if (officeId == null) {
+            Snackbar.make(binding.root, "Некорректный QR-код", Snackbar.LENGTH_LONG).show()
+            return
+        }
+
         val dao = AppDatabase.get(this).workSessionDao()
+
+        val open = withContext(Dispatchers.IO) {
+            dao.getOpenSessionForUser(userId)
+        }
+
+        if (open == null) {
+            Snackbar.make(binding.root, "Нет активной смены", Snackbar.LENGTH_LONG).show()
+            return
+        }
+
+        if (!open.officeId.isNullOrEmpty() && open.officeId != officeId) {
+            Snackbar.make(
+                binding.root,
+                "Сканирован неверный QR-код (должен быть тот же, что при входе)",
+                Snackbar.LENGTH_LONG
+            ).show()
+            return
+        }
+
         val end = System.currentTimeMillis()
         withContext(Dispatchers.IO) {
-            val open = dao.getOpenSessionForUser(userId)
-            if (open != null) dao.finishSession(open.id, end)
+            dao.finishSession(open.id, end)
         }
+
         openSession = null
         Snackbar.make(binding.root, "Смена завершена", Snackbar.LENGTH_SHORT).show()
         renderState()
     }
 
-    private fun parseOfficeId(qr: String): String? = qr
+    private fun parseOfficeId(qr: String): String? {
+        val trimmed = qr.trim()
+        return if (trimmed.isEmpty()) null else trimmed
+    }
+
+    // вспомогательный класс для кандидатов на добавление
+    private data class SimpleUser(
+        val userId: Long,
+        val email: String
+    )
 }
 
-private class SessionsAdapter :
-    ListAdapter<SessionWithUserEmail, SessionsAdapter.VH>(Diff) {
+/* ---------- модель для "свод по сотруднику за день" ---------- */
+private data class DaySummaryItem(
+    val userId: Long,
+    val userEmail: String,
+    val totalMinutes: Long
+)
 
-    object Diff : DiffUtil.ItemCallback<SessionWithUserEmail>() {
-        override fun areItemsTheSame(o: SessionWithUserEmail, n: SessionWithUserEmail) = o.id == n.id
-        override fun areContentsTheSame(o: SessionWithUserEmail, n: SessionWithUserEmail) = o == n
+/* ---------- адаптер календаря ---------- */
+private class SessionsAdapter :
+    ListAdapter<DaySummaryItem, SessionsAdapter.VH>(Diff) {
+
+    private var usersById: Map<Long, UserWithNames> = emptyMap()
+
+    fun updateUsers(map: Map<Long, UserWithNames>) {
+        usersById = map
+        notifyDataSetChanged()
+    }
+
+    object Diff : DiffUtil.ItemCallback<DaySummaryItem>() {
+        override fun areItemsTheSame(o: DaySummaryItem, n: DaySummaryItem) =
+            o.userId == n.userId && o.userEmail == n.userEmail
+
+        override fun areContentsTheSame(o: DaySummaryItem, n: DaySummaryItem) = o == n
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -432,30 +610,45 @@ private class SessionsAdapter :
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
-        holder.bind(getItem(position))
+        holder.bind(getItem(position), usersById)
     }
 
     class VH(private val binding: ItemSessionBinding) : RecyclerView.ViewHolder(binding.root) {
-        private val tf = SimpleDateFormat("HH:mm", Locale.getDefault())
-        fun bind(item: SessionWithUserEmail) {
-            binding.tvEmail.text = item.userEmail
-            val start = Date(item.startTime)
-            val text = if (item.endTime != null) {
-                val end = Date(item.endTime)
-                val durMin = TimeUnit.MILLISECONDS.toMinutes(item.endTime - item.startTime)
-                "${tf.format(start)} — ${tf.format(end)}  •  ${durMin} мин"
-            } else {
-                "${tf.format(start)} — … (ещё в работе)"
+
+        fun bind(item: DaySummaryItem, usersById: Map<Long, UserWithNames>) {
+            val user = usersById[item.userId]
+
+            val name = when {
+                user == null -> null
+                !user.firstName.isNullOrBlank() && !user.lastName.isNullOrBlank() ->
+                    "${user.firstName} ${user.lastName}"
+                !user.firstName.isNullOrBlank() -> user.firstName
+                !user.lastName.isNullOrBlank() -> user.lastName
+                else -> null
             }
-            binding.tvTime.text = text
+
+            val title = if (name != null) {
+                "$name (${item.userEmail})"
+            } else {
+                item.userEmail
+            }
+            binding.tvEmail.text = title
+
+            val hours = item.totalMinutes / 60
+            val minutes = item.totalMinutes % 60
+            val timeText = if (hours > 0) {
+                "${hours} ч ${minutes} мин"
+            } else {
+                "${minutes} мин"
+            }
+            binding.tvTime.text = timeText
         }
     }
 }
 
+/* ---------- адаптер списка сотрудников ---------- */
 private class EmployeesAdapter(
-    private val isHr: Boolean,
-    private val onClick: (UserWithNames) -> Unit,
-    private val onLongDelete: (UserWithNames) -> Unit
+    private val onClick: (UserWithNames) -> Unit
 ) : ListAdapter<UserWithNames, EmployeesAdapter.VH>(Diff) {
 
     object Diff : DiffUtil.ItemCallback<UserWithNames>() {
@@ -465,7 +658,7 @@ private class EmployeesAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val binding = ItemEmployeeBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return VH(binding, isHr, onClick, onLongDelete)
+        return VH(binding, onClick)
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
@@ -474,9 +667,7 @@ private class EmployeesAdapter(
 
     class VH(
         private val binding: ItemEmployeeBinding,
-        private val isHr: Boolean,
-        private val onClick: (UserWithNames) -> Unit,
-        private val onLongDelete: (UserWithNames) -> Unit
+        private val onClick: (UserWithNames) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
         private val df = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault())
 
@@ -488,14 +679,10 @@ private class EmployeesAdapter(
                 else -> u.email
             }
             binding.tvEmail.text = name
-            binding.tvMeta.text = "email: ${u.email} • зарегистрирован: ${df.format(Date(u.createdAt))}"
+            binding.tvMeta.text =
+                "email: ${u.email} • зарегистрирован: ${df.format(Date(u.createdAt))}"
 
             binding.root.setOnClickListener { onClick(u) }
-            if (isHr) {
-                binding.root.setOnLongClickListener { onLongDelete(u); true }
-            } else {
-                binding.root.setOnLongClickListener(null)
-            }
         }
     }
 }

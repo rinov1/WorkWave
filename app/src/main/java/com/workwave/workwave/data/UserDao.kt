@@ -7,6 +7,7 @@ import androidx.room.Query
 
 @Dao
 interface UserDao {
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(user: UserEntity): Long
 
@@ -18,6 +19,9 @@ interface UserDao {
 
     @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): UserEntity?
+
+    @Query("DELETE FROM users WHERE id = :id")
+    suspend fun deleteById(id: Long)
 
     @Query("""
         SELECT 
@@ -52,9 +56,6 @@ interface UserDao {
         ORDER BY u.email COLLATE NOCASE
     """)
     suspend fun getUsersNotInEmployees(): List<UserWithNames>
-
-    @Query("DELETE FROM users WHERE id = :id")
-    suspend fun deleteById(id: Long)
 }
 
 data class UserWithNames(

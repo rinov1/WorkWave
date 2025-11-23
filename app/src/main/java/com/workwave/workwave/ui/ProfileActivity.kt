@@ -11,6 +11,7 @@ import com.workwave.workwave.data.AppDatabase
 import com.workwave.workwave.data.EmployeeEntity
 import com.workwave.workwave.data.UserEntity
 import com.workwave.workwave.databinding.ActivityProfileBinding
+import com.workwave.workwave.firebase.FirebaseEmployees
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -23,6 +24,7 @@ class ProfileActivity : AppCompatActivity() {
     private var employee: EmployeeEntity? = null
     private var editMode = false
     private var hasChanges = false
+    private var canEditProfile = false   // <-- флаг: можно ли редактировать этот профиль
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null && editMode) {
@@ -38,17 +40,25 @@ class ProfileActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         userId = intent.getLongExtra("userId", -1L)
+        canEditProfile = intent.getBooleanExtra("editable", false)
 
         binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
         binding.toolbar.setOnMenuItemClickListener {
             when (it.itemId) {
                 com.workwave.workwave.R.id.action_edit -> {
+                    // Если нет прав на редактирование — игнорируем нажатие
+                    if (!canEditProfile) {
+                        return@setOnMenuItemClickListener true
+                    }
                     if (!editMode) setEditMode(true) else saveIfValid()
                     true
                 }
                 else -> false
             }
         }
+
+        // Скрываем кнопку "Изменить", если редактирование запрещено
+        binding.toolbar.menu.findItem(com.workwave.workwave.R.id.action_edit)?.isVisible = canEditProfile
 
         binding.ivAvatar.setOnClickListener { if (editMode) pickImage.launch("image/*") }
 
@@ -105,6 +115,9 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun setEditMode(enabled: Boolean) {
+        // Не разрешаем включить режим редактирования, если нет прав
+        if (enabled && !canEditProfile) return
+
         editMode = enabled
         binding.toolbar.menu.findItem(com.workwave.workwave.R.id.action_edit)?.title =
             if (enabled) "Сохранить" else "Изменить"
@@ -144,6 +157,8 @@ class ProfileActivity : AppCompatActivity() {
                 AppDatabase.get(this@ProfileActivity).employeeDao().insertOrUpdate(updated)
             }
             employee = updated
+            // Синк в Firestore — список обновится через listener
+            FirebaseEmployees.upsertEmployee(updated)
             hasChanges = true
             setResult(RESULT_OK)
             fillUi()

@@ -12,6 +12,7 @@ import com.workwave.workwave.data.AppDatabase
 import com.workwave.workwave.data.UserEntity
 import com.workwave.workwave.databinding.ActivityRegisterBinding
 import com.workwave.workwave.security.PasswordHasher
+import com.workwave.workwave.firebase.FirebaseEmployees
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,7 +74,16 @@ class RegisterActivity : AppCompatActivity() {
                     isHr = false
                 )
 
-                withContext(Dispatchers.IO) { dao.insert(user) }
+                val newUserId = withContext(Dispatchers.IO) { dao.insert(user) }
+
+                // Синк в Firestore: users + employees — чтобы сразу появился в списке
+                FirebaseEmployees.upsertUser(user.copy(id = newUserId))
+                FirebaseEmployees.upsertEmployee(
+                    com.workwave.workwave.data.EmployeeEntity(
+                        userId = newUserId,
+                        email = email
+                    )
+                )
 
                 Snackbar.make(binding.root, "Аккаунт создан. Войдите.", Snackbar.LENGTH_LONG).show()
                 startActivity(

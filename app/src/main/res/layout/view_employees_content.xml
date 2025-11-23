@@ -1,43 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:orientation="vertical"
+    android:id="@+id/root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
 
+    <!-- Панель кнопок HR сверху -->
     <LinearLayout
-        android:id="@+id/hrActionsBar"
-        android:visibility="gone"
-        android:orientation="horizontal"
-        android:padding="12dp"
+        android:id="@+id/hrButtonsContainer"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_horizontal"
+        android:layout_marginBottom="8dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnAddEmployee"
             style="@style/WorkWave.BlueRoundedButton"
-            android:text="добавить"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"/>
-
-        <View
-            android:layout_width="12dp"
-            android:layout_height="0dp"/>
+            android:text="Добавить"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDeleteEmployee"
             style="@style/WorkWave.BlueRoundedButton"
-            android:text="удалить"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"/>
+            android:text="Удалить"
+            android:layout_marginStart="12dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
+    <!-- Список сотрудников -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvEmployees"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="8dp"
-        android:clipToPadding="false" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
 </LinearLayout>

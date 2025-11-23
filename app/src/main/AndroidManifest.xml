@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.workwave.workwave">
 
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:label="WorkWave"
@@ -9,20 +10,12 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.WorkWave">
 
-
         <activity android:name=".ui.ProfileActivity"
             android:exported="false"/>
 
         <activity android:name=".ui.SettingsActivity"
             android:exported="false"/>
 
-        <activity
-            android:name=".ui.CalendarActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ui.EmployeesActivity"
-            android:exported="false" />
 
         <activity
             android:name=".ui.HomeActivity"

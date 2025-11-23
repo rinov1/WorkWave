@@ -34,6 +34,9 @@ interface WorkSessionDao {
         ORDER BY ws.startTime ASC
     """)
     suspend fun sessionsByDay(startMillis: Long, endMillis: Long): List<SessionWithUserEmail>
+
+    @Query("DELETE FROM work_sessions WHERE userId = :userId")
+    suspend fun deleteByUserId(userId: Long)
 }
 
 data class SessionWithUserEmail(
