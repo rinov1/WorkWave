@@ -1,5 +1,6 @@
 package com.workwave.workwave.ui
 
+import android.app.DatePickerDialog
 import android.net.Uri
 import android.os.Bundle
 import android.util.Patterns
@@ -15,7 +16,10 @@ import com.workwave.workwave.firebase.FirebaseEmployees
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class ProfileActivity : AppCompatActivity() {
 
@@ -24,15 +28,20 @@ class ProfileActivity : AppCompatActivity() {
     private var employee: EmployeeEntity? = null
     private var editMode = false
     private var hasChanges = false
-    private var canEditProfile = false   // <-- флаг: можно ли редактировать этот профиль
+    private var canEditProfile = false
+    private var isHr: Boolean = false
 
-    private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null && editMode) {
-            binding.ivAvatar.setImageURI(uri)
-            employee = (employee ?: EmployeeEntity()).copy(avatarUri = uri.toString(), userId = userId)
-            hasChanges = true
+    private val pickImage =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null && editMode && canEditProfile) {
+                binding.ivAvatar.setImageURI(uri)
+                employee = (employee ?: EmployeeEntity()).copy(
+                    avatarUri = uri.toString(),
+                    userId = userId
+                )
+                hasChanges = true
+            }
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,26 +50,33 @@ class ProfileActivity : AppCompatActivity() {
 
         userId = intent.getLongExtra("userId", -1L)
         canEditProfile = intent.getBooleanExtra("editable", false)
+        isHr = intent.getBooleanExtra("hrMode", false)
 
-        binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        binding.toolbar.setNavigationOnClickListener {
+            onBackPressedDispatcher.onBackPressed()
+        }
         binding.toolbar.setOnMenuItemClickListener {
             when (it.itemId) {
                 com.workwave.workwave.R.id.action_edit -> {
-                    // Если нет прав на редактирование — игнорируем нажатие
-                    if (!canEditProfile) {
-                        return@setOnMenuItemClickListener true
-                    }
+                    if (!canEditProfile) return@setOnMenuItemClickListener true
                     if (!editMode) setEditMode(true) else saveIfValid()
                     true
                 }
+
                 else -> false
             }
         }
 
-        // Скрываем кнопку "Изменить", если редактирование запрещено
-        binding.toolbar.menu.findItem(com.workwave.workwave.R.id.action_edit)?.isVisible = canEditProfile
+        binding.toolbar.menu.findItem(com.workwave.workwave.R.id.action_edit)?.isVisible =
+            canEditProfile
 
-        binding.ivAvatar.setOnClickListener { if (editMode) pickImage.launch("image/*") }
+        binding.ivAvatar.setOnClickListener {
+            if (editMode && canEditProfile) pickImage.launch("image/*")
+        }
+
+        binding.btnPickHireDate.setOnClickListener {
+            if (editMode && isHr) showHireDatePicker()
+        }
 
         lifecycleScope.launch { loadData() }
     }
@@ -87,15 +103,21 @@ class ProfileActivity : AppCompatActivity() {
     private fun fillUi() {
         val e = employee ?: return
 
-        val fullName = listOfNotNull(e.firstName, e.lastName).joinToString(" ").ifEmpty { "-" }
+        val fullName =
+            listOfNotNull(e.firstName, e.lastName).joinToString(" ").ifEmpty { "-" }
         binding.tvFullName.text = fullName
 
         binding.tvPhone.text = e.phone ?: "-"
         binding.tvEmail.text = e.email ?: "-"
 
         binding.tvPosition.text = e.position ?: "-"
+        binding.tilPosition.editText?.setText(e.position ?: "")
+
         binding.tvTenure.text = tenureText(e.hireDate)
+        binding.tvHireDate.text = formatHireDate(e.hireDate)
+
         binding.tvStatus.text = if (e.onVacation) "В отпуске" else "Работает"
+        binding.swVacation.isChecked = e.onVacation
 
         if (!e.avatarUri.isNullOrEmpty()) {
             binding.ivAvatar.setImageURI(Uri.parse(e.avatarUri))
@@ -108,14 +130,19 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun tenureText(hireDate: Long?): String {
-        if (hireDate == null) return "-"
+        if (hireDate == null || hireDate <= 0) return "-"
         val now = Calendar.getInstance().timeInMillis
         val years = ((now - hireDate) / (365.25 * 24 * 60 * 60 * 1000)).toInt()
         return if (years <= 0) "меньше года" else "$years лет"
     }
 
+    private fun formatHireDate(hireDate: Long?): String {
+        if (hireDate == null || hireDate <= 0) return "-"
+        val df = SimpleDateFormat("d MMM yyyy", Locale("ru", "RU"))
+        return df.format(Date(hireDate))
+    }
+
     private fun setEditMode(enabled: Boolean) {
-        // Не разрешаем включить режим редактирования, если нет прав
         if (enabled && !canEditProfile) return
 
         editMode = enabled
@@ -130,6 +157,32 @@ class ProfileActivity : AppCompatActivity() {
 
         binding.tvEmail.visibility = if (enabled) View.GONE else View.VISIBLE
         binding.tilEmail.visibility = if (enabled) View.VISIBLE else View.GONE
+
+        if (isHr) {
+            if (enabled) {
+                binding.tvPosition.visibility = View.GONE
+                binding.tilPosition.visibility = View.VISIBLE
+
+                binding.groupHireDate.visibility = View.VISIBLE
+
+                binding.tvStatus.visibility = View.GONE
+                binding.swVacation.visibility = View.VISIBLE
+            } else {
+                binding.tvPosition.visibility = View.VISIBLE
+                binding.tilPosition.visibility = View.GONE
+
+                binding.groupHireDate.visibility = View.GONE
+
+                binding.tvStatus.visibility = View.VISIBLE
+                binding.swVacation.visibility = View.GONE
+            }
+        } else {
+            binding.tvPosition.visibility = View.VISIBLE
+            binding.tilPosition.visibility = View.GONE
+            binding.groupHireDate.visibility = View.GONE
+            binding.tvStatus.visibility = View.VISIBLE
+            binding.swVacation.visibility = View.GONE
+        }
     }
 
     private fun saveIfValid() {
@@ -144,26 +197,58 @@ class ProfileActivity : AppCompatActivity() {
         }
         binding.tilEmail.error = null
 
-        val updated = (employee ?: EmployeeEntity()).copy(
-            userId = userId,
+        val cur = (employee ?: EmployeeEntity()).copy(userId = userId)
+
+        var updated = cur.copy(
             firstName = first.ifEmpty { null },
-            lastName  = last.ifEmpty { null },
-            phone     = phone.ifEmpty { null },
-            email     = email.ifEmpty { null }
+            lastName = last.ifEmpty { null },
+            phone = phone.ifEmpty { null },
+            email = email.ifEmpty { null }
         )
+
+        if (isHr) {
+            val posText =
+                binding.tilPosition.editText?.text?.toString()?.trim().orEmpty()
+            updated = updated.copy(
+                position = posText.ifEmpty { null },
+                onVacation = binding.swVacation.isChecked
+            )
+        }
 
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
-                AppDatabase.get(this@ProfileActivity).employeeDao().insertOrUpdate(updated)
+                AppDatabase.get(this@ProfileActivity)
+                    .employeeDao()
+                    .insertOrUpdate(updated)
             }
             employee = updated
-            // Синк в Firestore — список обновится через listener
             FirebaseEmployees.upsertEmployee(updated)
             hasChanges = true
             setResult(RESULT_OK)
             fillUi()
             setEditMode(false)
         }
+    }
+
+    private fun showHireDatePicker() {
+        val current = employee ?: (EmployeeEntity(userId = userId))
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = current.hireDate ?: System.currentTimeMillis()
+
+        DatePickerDialog(
+            this,
+            { _, year, month, dayOfMonth ->
+                val newCal = Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth, 0, 0, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                employee = current.copy(hireDate = newCal.timeInMillis)
+                fillUi()
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
     }
 
     override fun onBackPressed() {

@@ -12,7 +12,6 @@ object FirebaseEmployees {
 
     private val db = Firebase.firestore
 
-    // users/{userId} — краткая инфа о пользователе (для авторизации и т.п.)
     fun upsertUser(user: UserEntity) {
         val docId = user.id.toString()
         val data = mapOf(
@@ -24,7 +23,6 @@ object FirebaseEmployees {
         db.collection("users").document(docId).set(data)
     }
 
-    // employees/{userId} — карточка сотрудника для списка
     fun upsertEmployee(employee: EmployeeEntity) {
         val uid = employee.userId ?: return
         val data = hashMapOf(
@@ -38,36 +36,22 @@ object FirebaseEmployees {
             "avatarUri" to (employee.avatarUri ?: ""),
             "onVacation" to employee.onVacation,
             "hireDate" to (employee.hireDate ?: 0L),
-            // для списка сотрудников используем это createdAt
             "createdAt" to System.currentTimeMillis(),
-            // активен ли сотрудник (для "удаления" ставим false)
             "active" to true
         )
         db.collection("employees").document(uid.toString()).set(data)
     }
 
-    /**
-     * Логическое удаление сотрудника:
-     *  - помечаем "active" = false в коллекции employees/{userId}
-     *  - благодаря фильтру .whereEqualTo("active", true) он пропадает из списка
-     *  - данные при этом не теряются (можно будет восстановить, если нужно)
-     */
     fun deleteEmployee(userId: Long) {
         db.collection("employees")
             .document(userId.toString())
             .update("active", false)
     }
 
-    /**
-     * Старое имя метода — оставлено для совместимости.
-     * Если где-то в коде уже используется deleteEmployeeByUserId, он тоже будет работать.
-     */
     fun deleteEmployeeByUserId(userId: Long) {
         deleteEmployee(userId)
     }
 
-    // Живой список активных сотрудников.
-    // HR сюда не попадает, если для HR не создаём карточку в employees.
     fun listenEmployees(onUpdate: (List<UserWithNames>) -> Unit): ListenerRegistration {
         return db.collection("employees")
             .whereEqualTo("active", true)

@@ -50,23 +50,18 @@ class HomeActivity : AppCompatActivity() {
     private var openSession: WorkSessionEntity? = null
     private var pendingAction: Action? = null
 
-    // флаг "режим удаления сотрудника"
     private var isDeleteMode: Boolean = false
 
-    // календарь — свод по сотрудникам за день
     private val sessionsAdapter = SessionsAdapter()
     private lateinit var employeesAdapter: EmployeesAdapter
 
-    // все сотрудники, которые сейчас в списке (из Firestore)
     private var allEmployees: List<UserWithNames> = emptyList()
 
     private enum class Action { START, FINISH }
 
-    // launcher профиля
     private val profileLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { /* no-op */ }
 
-    // Permission-на-запрос камеры
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
@@ -108,7 +103,6 @@ class HomeActivity : AppCompatActivity() {
             } else false
         }
 
-        // слушаем список сотрудников из Firestore
         FirebaseEmployees.listenEmployees { list ->
             allEmployees = list
             if (::employeesAdapter.isInitialized) {
@@ -117,11 +111,9 @@ class HomeActivity : AppCompatActivity() {
             sessionsAdapter.updateUsers(list.associateBy { it.userId })
         }
 
-        // шапка недели и дата
         setupWeekStrip()
         setupTodayTexts()
 
-        // старт и стоп смены
         binding.btnStart.setOnClickListener {
             pendingAction = Action.START
             ensureCameraPermThenScan()
@@ -201,7 +193,6 @@ class HomeActivity : AppCompatActivity() {
         setupEmployeesButtons()
     }
 
-    /** кнопки "Добавить" и "Удалить" сверху списка сотрудников */
     private fun setupEmployeesButtons() {
         val addBtn = binding.incEmployees.btnAddEmployee
         val delBtn = binding.incEmployees.btnDeleteEmployee
@@ -218,7 +209,6 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
-    /** клик по сотруднику в списке */
     private fun onEmployeeClicked(user: UserWithNames) {
         if (isHr && isDeleteMode) {
             confirmDeleteEmployee(user)
@@ -227,7 +217,6 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
-    /** включение / выключение режима удаления */
     private fun toggleDeleteMode() {
         if (!isHr) return
         isDeleteMode = !isDeleteMode
@@ -241,7 +230,6 @@ class HomeActivity : AppCompatActivity() {
         Snackbar.make(binding.root, msg, Snackbar.LENGTH_SHORT).show()
     }
 
-    /** диалог подтверждения удаления сотрудника */
     private fun confirmDeleteEmployee(user: UserWithNames) {
         AlertDialog.Builder(this)
             .setTitle("Удалить сотрудника?")
@@ -253,7 +241,6 @@ class HomeActivity : AppCompatActivity() {
             .show()
     }
 
-    /** фактическое удаление сотрудника из Room и Firestore */
     private suspend fun deleteEmployee(user: UserWithNames) {
         withContext(Dispatchers.IO) {
             val db = AppDatabase.get(this@HomeActivity)
@@ -261,7 +248,6 @@ class HomeActivity : AppCompatActivity() {
             db.employeeDao().deleteByUserId(user.userId)
             db.userDao().deleteById(user.userId)
         }
-        // Firestore
         FirebaseEmployees.deleteEmployeeByUserId(user.userId)
 
         isDeleteMode = false
@@ -270,10 +256,6 @@ class HomeActivity : AppCompatActivity() {
         Snackbar.make(binding.root, "Сотрудник удалён", Snackbar.LENGTH_SHORT).show()
     }
 
-    /**
-     * Кнопка "Добавить": показываем пользователей, которых нет в списке сотрудников,
-     * выбираем одного и добавляем в коллекцию employees (Firestore).
-     */
     private fun showAddEmployeeDialog() {
         if (!isHr) return
 
@@ -288,7 +270,6 @@ class HomeActivity : AppCompatActivity() {
                     val email = d.getString("email") ?: return@mapNotNull null
                     val isHrUser = d.getBoolean("isHr") ?: false
 
-                    // пропускаем HR и тех, кто уже в списке сотрудников
                     if (isHrUser || activeIds.contains(id)) {
                         null
                     } else {
@@ -307,7 +288,6 @@ class HomeActivity : AppCompatActivity() {
                     .setTitle("Выберите сотрудника для добавления")
                     .setItems(labels) { _, which ->
                         val u = candidates[which]
-                        // создаём минимальную карточку сотрудника в Firestore
                         val emp = EmployeeEntity(
                             userId = u.userId,
                             email = u.email
@@ -327,12 +307,6 @@ class HomeActivity : AppCompatActivity() {
             }
     }
 
-    /**
-     * Открытие профиля сотрудника.
-     *
-     * - HR может редактировать любого.
-     * - Обычный сотрудник может редактировать только себя.
-     */
     private fun openEmployee(targetUserId: Long) {
         val canEdit = isHr || (targetUserId == userId)
 
@@ -344,7 +318,6 @@ class HomeActivity : AppCompatActivity() {
         )
     }
 
-    // ————— ШАПКА НЕДЕЛИ И ДАТА —————
 
     private fun setupWeekStrip() {
         val ru = Locale("ru", "RU")
@@ -384,7 +357,6 @@ class HomeActivity : AppCompatActivity() {
         binding.tvDate.text = fmt.format(Date())
     }
 
-    // ————————————————————————————————————
 
     private fun updateSelectedDateText(dayMillis: Long) {
         val ru = Locale("ru", "RU")
@@ -572,21 +544,18 @@ class HomeActivity : AppCompatActivity() {
         return if (trimmed.isEmpty()) null else trimmed
     }
 
-    // вспомогательный класс для кандидатов на добавление
     private data class SimpleUser(
         val userId: Long,
         val email: String
     )
 }
 
-/* ---------- модель для "свод по сотруднику за день" ---------- */
 private data class DaySummaryItem(
     val userId: Long,
     val userEmail: String,
     val totalMinutes: Long
 )
 
-/* ---------- адаптер календаря ---------- */
 private class SessionsAdapter :
     ListAdapter<DaySummaryItem, SessionsAdapter.VH>(Diff) {
 
@@ -646,7 +615,6 @@ private class SessionsAdapter :
     }
 }
 
-/* ---------- адаптер списка сотрудников ---------- */
 private class EmployeesAdapter(
     private val onClick: (UserWithNames) -> Unit
 ) : ListAdapter<UserWithNames, EmployeesAdapter.VH>(Diff) {

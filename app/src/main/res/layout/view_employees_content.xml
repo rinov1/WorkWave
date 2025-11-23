@@ -7,7 +7,6 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- Панель кнопок HR сверху -->
     <LinearLayout
         android:id="@+id/hrButtonsContainer"
         android:layout_width="match_parent"
@@ -32,7 +31,6 @@
             android:layout_height="wrap_content" />
     </LinearLayout>
 
-    <!-- Список сотрудников -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvEmployees"
         android:layout_width="match_parent"

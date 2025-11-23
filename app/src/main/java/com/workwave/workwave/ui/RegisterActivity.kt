@@ -76,7 +76,6 @@ class RegisterActivity : AppCompatActivity() {
 
                 val newUserId = withContext(Dispatchers.IO) { dao.insert(user) }
 
-                // Синк в Firestore: users + employees — чтобы сразу появился в списке
                 FirebaseEmployees.upsertUser(user.copy(id = newUserId))
                 FirebaseEmployees.upsertEmployee(
                     com.workwave.workwave.data.EmployeeEntity(
