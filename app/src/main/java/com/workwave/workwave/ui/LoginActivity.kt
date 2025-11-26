@@ -27,8 +27,12 @@ class LoginActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.btnLogin.setOnClickListener { login() }
+
         binding.tvForgot.setOnClickListener {
-            Snackbar.make(binding.root, "В офлайн-примере восстановления нет", Snackbar.LENGTH_SHORT).show()
+            startActivity(
+                Intent(this, RegisterActivity::class.java)
+                    .putExtra("hrMode", false)
+            )
         }
     }
 
@@ -69,11 +73,19 @@ class LoginActivity : AppCompatActivity() {
             }
 
             if (user == null) {
-                Snackbar.make(binding.root, "Пользователь не найден. Зарегистрируйтесь.", Snackbar.LENGTH_LONG).show()
+                Snackbar.make(
+                    binding.root,
+                    "Пользователь не найден. Зарегистрируйтесь.",
+                    Snackbar.LENGTH_LONG
+                ).show()
                 return@launch
             }
 
-            val ok = PasswordHasher.verify(password.toCharArray(), user.saltB64, user.passwordHashB64)
+            val ok = PasswordHasher.verify(
+                password.toCharArray(),
+                user.saltB64,
+                user.passwordHashB64
+            )
             if (ok) {
                 startActivity(
                     Intent(this@LoginActivity, HomeActivity::class.java)

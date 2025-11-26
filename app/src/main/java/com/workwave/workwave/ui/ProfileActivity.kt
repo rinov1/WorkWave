@@ -1,6 +1,7 @@
 package com.workwave.workwave.ui
 
 import android.app.DatePickerDialog
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Patterns
@@ -30,6 +31,7 @@ class ProfileActivity : AppCompatActivity() {
     private var hasChanges = false
     private var canEditProfile = false
     private var isHr: Boolean = false
+    private var isOwnProfile: Boolean = false
 
     private val pickImage =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -51,6 +53,7 @@ class ProfileActivity : AppCompatActivity() {
         userId = intent.getLongExtra("userId", -1L)
         canEditProfile = intent.getBooleanExtra("editable", false)
         isHr = intent.getBooleanExtra("hrMode", false)
+        isOwnProfile = intent.getBooleanExtra("ownProfile", false)
 
         binding.toolbar.setNavigationOnClickListener {
             onBackPressedDispatcher.onBackPressed()
@@ -62,7 +65,6 @@ class ProfileActivity : AppCompatActivity() {
                     if (!editMode) setEditMode(true) else saveIfValid()
                     true
                 }
-
                 else -> false
             }
         }
@@ -76,6 +78,11 @@ class ProfileActivity : AppCompatActivity() {
 
         binding.btnPickHireDate.setOnClickListener {
             if (editMode && isHr) showHireDatePicker()
+        }
+
+        binding.btnLogout.visibility = if (isOwnProfile) View.VISIBLE else View.GONE
+        binding.btnLogout.setOnClickListener {
+            logout()
         }
 
         lifecycleScope.launch { loadData() }
@@ -249,6 +256,13 @@ class ProfileActivity : AppCompatActivity() {
             cal.get(Calendar.MONTH),
             cal.get(Calendar.DAY_OF_MONTH)
         ).show()
+    }
+
+    private fun logout() {
+        val intent = Intent(this, LoginActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
     }
 
     override fun onBackPressed() {

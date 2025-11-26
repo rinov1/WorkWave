@@ -42,14 +42,10 @@ object FirebaseEmployees {
         db.collection("employees").document(uid.toString()).set(data)
     }
 
-    fun deleteEmployee(userId: Long) {
+    fun deleteEmployeeByUserId(userId: Long) {
         db.collection("employees")
             .document(userId.toString())
             .update("active", false)
-    }
-
-    fun deleteEmployeeByUserId(userId: Long) {
-        deleteEmployee(userId)
     }
 
     fun listenEmployees(onUpdate: (List<UserWithNames>) -> Unit): ListenerRegistration {
@@ -58,21 +54,13 @@ object FirebaseEmployees {
             .orderBy("lastNameLower", Query.Direction.ASCENDING)
             .addSnapshotListener { snap, e ->
                 if (e != null || snap == null) return@addSnapshotListener
-
                 val list = snap.documents.mapNotNull { d ->
-                    val userId = d.getLong("userId") ?: return@mapNotNull null
+                    val uid = d.getLong("userId") ?: return@mapNotNull null
                     val email = d.getString("email") ?: return@mapNotNull null
                     val first = d.getString("firstName")
                     val last = d.getString("lastName")
                     val createdAt = d.getLong("createdAt") ?: 0L
-
-                    UserWithNames(
-                        userId = userId,
-                        email = email,
-                        firstName = first,
-                        lastName = last,
-                        createdAt = createdAt
-                    )
+                    UserWithNames(uid, email, first, last, createdAt)
                 }
                 onUpdate(list)
             }

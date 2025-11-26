@@ -60,7 +60,7 @@ class HomeActivity : AppCompatActivity() {
     private enum class Action { START, FINISH }
 
     private val profileLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { /* no-op */ }
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
 
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -98,6 +98,7 @@ class HomeActivity : AppCompatActivity() {
                     .putExtra("userId", userId)
                     .putExtra("editable", true)
                     .putExtra("hrMode", isHr)
+                    .putExtra("ownProfile", true)
                 profileLauncher.launch(intent)
                 true
             } else false
@@ -233,7 +234,7 @@ class HomeActivity : AppCompatActivity() {
     private fun confirmDeleteEmployee(user: UserWithNames) {
         AlertDialog.Builder(this)
             .setTitle("Удалить сотрудника?")
-            .setMessage("Удалить ${user.email}? Также будут удалены все его смены.")
+            .setMessage("Удалить ${user.email} из списка сотрудников?")
             .setPositiveButton("Удалить") { _, _ ->
                 lifecycleScope.launch { deleteEmployee(user) }
             }
@@ -242,18 +243,12 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private suspend fun deleteEmployee(user: UserWithNames) {
-        withContext(Dispatchers.IO) {
-            val db = AppDatabase.get(this@HomeActivity)
-            db.workSessionDao().deleteByUserId(user.userId)
-            db.employeeDao().deleteByUserId(user.userId)
-            db.userDao().deleteById(user.userId)
-        }
         FirebaseEmployees.deleteEmployeeByUserId(user.userId)
 
         isDeleteMode = false
         binding.incEmployees.btnDeleteEmployee.text = "Удалить"
 
-        Snackbar.make(binding.root, "Сотрудник удалён", Snackbar.LENGTH_SHORT).show()
+        Snackbar.make(binding.root, "Сотрудник удалён из списка", Snackbar.LENGTH_SHORT).show()
     }
 
     private fun showAddEmployeeDialog() {
@@ -269,7 +264,6 @@ class HomeActivity : AppCompatActivity() {
                     val id = d.getLong("userId") ?: return@mapNotNull null
                     val email = d.getString("email") ?: return@mapNotNull null
                     val isHrUser = d.getBoolean("isHr") ?: false
-
                     if (isHrUser || activeIds.contains(id)) {
                         null
                     } else {
@@ -288,12 +282,19 @@ class HomeActivity : AppCompatActivity() {
                     .setTitle("Выберите сотрудника для добавления")
                     .setItems(labels) { _, which ->
                         val u = candidates[which]
-                        val emp = EmployeeEntity(
-                            userId = u.userId,
-                            email = u.email
-                        )
-                        FirebaseEmployees.upsertEmployee(emp)
-                        Snackbar.make(binding.root, "Сотрудник добавлен", Snackbar.LENGTH_SHORT).show()
+                        lifecycleScope.launch {
+                            val empFromDb = withContext(Dispatchers.IO) {
+                                AppDatabase.get(this@HomeActivity)
+                                    .employeeDao()
+                                    .findByUserId(u.userId)
+                            }
+                            val emp = empFromDb ?: EmployeeEntity(
+                                userId = u.userId,
+                                email = u.email
+                            )
+                            FirebaseEmployees.upsertEmployee(emp)
+                            Snackbar.make(binding.root, "Сотрудник добавлен", Snackbar.LENGTH_SHORT).show()
+                        }
                     }
                     .setNegativeButton("Отмена", null)
                     .show()
@@ -315,9 +316,9 @@ class HomeActivity : AppCompatActivity() {
                 .putExtra("userId", targetUserId)
                 .putExtra("editable", canEdit)
                 .putExtra("hrMode", isHr)
+                .putExtra("ownProfile", targetUserId == userId)
         )
     }
-
 
     private fun setupWeekStrip() {
         val ru = Locale("ru", "RU")
@@ -357,7 +358,6 @@ class HomeActivity : AppCompatActivity() {
         binding.tvDate.text = fmt.format(Date())
     }
 
-
     private fun updateSelectedDateText(dayMillis: Long) {
         val ru = Locale("ru", "RU")
         val df = SimpleDateFormat("EEEE, d MMMM yyyy", ru)
@@ -390,11 +390,15 @@ class HomeActivity : AppCompatActivity() {
                 .filter { it.endTime != null }
                 .groupBy { it.userId to it.userEmail }
                 .map { (key, list) ->
+                    val firstStart = list.minOfOrNull { s -> s.startTime }
+                    val lastEnd = list.maxOfOrNull { s -> s.endTime!! }
                     val totalMs = list.sumOf { s -> (s.endTime!! - s.startTime) }
                     DaySummaryItem(
                         userId = key.first,
                         userEmail = key.second,
-                        totalMinutes = TimeUnit.MILLISECONDS.toMinutes(totalMs)
+                        totalMillis = totalMs,
+                        firstStart = firstStart,
+                        lastEnd = lastEnd
                     )
                 }
                 .sortedBy { it.userEmail }
@@ -553,7 +557,9 @@ class HomeActivity : AppCompatActivity() {
 private data class DaySummaryItem(
     val userId: Long,
     val userEmail: String,
-    val totalMinutes: Long
+    val totalMillis: Long,
+    val firstStart: Long?,
+    val lastEnd: Long?
 )
 
 private class SessionsAdapter :
@@ -584,6 +590,19 @@ private class SessionsAdapter :
 
     class VH(private val binding: ItemSessionBinding) : RecyclerView.ViewHolder(binding.root) {
 
+        private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
+        private fun formatMinutesRu(m: Long): String {
+            val n = (m % 100).toInt()
+            val form = when {
+                n in 11..14 -> "минут"
+                n % 10 == 1 -> "минута"
+                n % 10 in 2..4 -> "минуты"
+                else -> "минут"
+            }
+            return "$m $form"
+        }
+
         fun bind(item: DaySummaryItem, usersById: Map<Long, UserWithNames>) {
             val user = usersById[item.userId]
 
@@ -603,14 +622,13 @@ private class SessionsAdapter :
             }
             binding.tvEmail.text = title
 
-            val hours = item.totalMinutes / 60
-            val minutes = item.totalMinutes % 60
-            val timeText = if (hours > 0) {
-                "${hours} ч ${minutes} мин"
-            } else {
-                "${minutes} мин"
-            }
-            binding.tvTime.text = timeText
+            val startStr = item.firstStart?.let { timeFmt.format(Date(it)) } ?: "?"
+            val endStr = item.lastEnd?.let { timeFmt.format(Date(it)) } ?: "?"
+
+            val totalMinutes = TimeUnit.MILLISECONDS.toMinutes(item.totalMillis)
+            val durationText = formatMinutesRu(totalMinutes)
+
+            binding.tvTime.text = "$durationText $startStr - $endStr"
         }
     }
 }

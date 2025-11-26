@@ -1,18 +1,17 @@
 package com.workwave.workwave.ui
 
 import android.content.Intent
-import android.database.sqlite.SQLiteConstraintException
 import android.os.Bundle
-import android.util.Log
 import android.util.Patterns
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
 import com.workwave.workwave.data.AppDatabase
+import com.workwave.workwave.data.EmployeeEntity
 import com.workwave.workwave.data.UserEntity
 import com.workwave.workwave.databinding.ActivityRegisterBinding
-import com.workwave.workwave.security.PasswordHasher
 import com.workwave.workwave.firebase.FirebaseEmployees
+import com.workwave.workwave.security.PasswordHasher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -20,23 +19,24 @@ import kotlinx.coroutines.withContext
 class RegisterActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityRegisterBinding
+    private var hrMode: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.btnRegister.setOnClickListener { register() }
+        hrMode = intent.getBooleanExtra("hrMode", false)
+
+        binding.btnRegister.setOnClickListener { registerUser() }
+
         binding.tvAlready.setOnClickListener {
-            startActivity(
-                Intent(this, LoginActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
+            startActivity(Intent(this, LoginActivity::class.java))
             finish()
         }
     }
 
-    private fun register() {
+    private fun registerUser() {
         val emailRaw = binding.etEmail.text?.toString()?.trim().orEmpty()
         val password = binding.etPassword.text?.toString().orEmpty()
 
@@ -54,50 +54,52 @@ class RegisterActivity : AppCompatActivity() {
 
         val email = emailRaw.lowercase()
 
-        binding.btnRegister.isEnabled = false
         lifecycleScope.launch {
-            val dao = AppDatabase.get(this@RegisterActivity).userDao()
-            try {
-                val exists = withContext(Dispatchers.IO) { dao.findByEmail(email) }
-                if (exists != null) {
-                    Snackbar.make(binding.root, "Почта уже зарегистрирована", Snackbar.LENGTH_LONG).show()
-                    return@launch
-                }
+            val db = AppDatabase.get(this@RegisterActivity)
+            val userDao = db.userDao()
+            val employeeDao = db.employeeDao()
 
-                val salt = PasswordHasher.generateSalt()
-                val hash = PasswordHasher.hash(password.toCharArray(), salt)
-
-                val user = UserEntity(
-                    email = email,
-                    passwordHashB64 = PasswordHasher.toB64(hash),
-                    saltB64 = PasswordHasher.toB64(salt),
-                    isHr = false
-                )
-
-                val newUserId = withContext(Dispatchers.IO) { dao.insert(user) }
-
-                FirebaseEmployees.upsertUser(user.copy(id = newUserId))
-                FirebaseEmployees.upsertEmployee(
-                    com.workwave.workwave.data.EmployeeEntity(
-                        userId = newUserId,
-                        email = email
-                    )
-                )
-
-                Snackbar.make(binding.root, "Аккаунт создан. Войдите.", Snackbar.LENGTH_LONG).show()
-                startActivity(
-                    Intent(this@RegisterActivity, LoginActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-                )
-                finish()
-            } catch (e: SQLiteConstraintException) {
-                Snackbar.make(binding.root, "Почта уже зарегистрирована", Snackbar.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                Log.e("RegisterActivity", "Ошибка регистрации", e)
-                Snackbar.make(binding.root, "Ошибка регистрации: ${e.message}", Snackbar.LENGTH_LONG).show()
-            } finally {
-                binding.btnRegister.isEnabled = true
+            val existing = withContext(Dispatchers.IO) { userDao.findByEmail(email) }
+            if (existing != null) {
+                Snackbar.make(
+                    binding.root,
+                    "Пользователь с такой почтой уже существует",
+                    Snackbar.LENGTH_LONG
+                ).show()
+                return@launch
             }
+
+            val salt = PasswordHasher.generateSalt()
+            val hash = PasswordHasher.hash(password.toCharArray(), salt)
+
+            val newUser = UserEntity(
+                email = email,
+                passwordHashB64 = PasswordHasher.toB64(hash),
+                saltB64 = PasswordHasher.toB64(salt),
+                isHr = hrMode
+            )
+
+            val newId = withContext(Dispatchers.IO) { userDao.insert(newUser) }
+            val userWithId = newUser.copy(id = newId)
+
+            val employee = EmployeeEntity(
+                userId = newId,
+                email = email
+            )
+
+            withContext(Dispatchers.IO) {
+                employeeDao.insertOrUpdate(employee)
+            }
+
+            FirebaseEmployees.upsertUser(userWithId)
+            FirebaseEmployees.upsertEmployee(employee)
+
+            startActivity(
+                Intent(this@RegisterActivity, HomeActivity::class.java)
+                    .putExtra("userId", userWithId.id)
+                    .putExtra("isHr", userWithId.isHr)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            )
         }
     }
 }
