@@ -10,7 +10,6 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -25,7 +24,6 @@ import com.google.firebase.ktx.Firebase
 import com.workwave.workwave.R
 import com.workwave.workwave.data.AppDatabase
 import com.workwave.workwave.data.EmployeeEntity
-import com.workwave.workwave.data.SessionWithUserEmail
 import com.workwave.workwave.data.UserWithNames
 import com.workwave.workwave.data.WorkSessionEntity
 import com.workwave.workwave.databinding.ActivityHomeBinding
@@ -41,7 +39,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-class HomeActivity : AppCompatActivity() {
+class HomeActivity : BaseActivity() {
 
     private lateinit var binding: ActivityHomeBinding
     private var userId: Long = -1L
@@ -59,6 +57,10 @@ class HomeActivity : AppCompatActivity() {
 
     private enum class Action { START, FINISH }
 
+    private val settingsPrefs by lazy {
+        getSharedPreferences("settings", MODE_PRIVATE)
+    }
+
     private val profileLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
 
@@ -69,7 +71,7 @@ class HomeActivity : AppCompatActivity() {
             } else {
                 Snackbar.make(
                     binding.root,
-                    "Дайте доступ к камере для сканирования QR",
+                    getString(R.string.camera_permission_denied),
                     Snackbar.LENGTH_LONG
                 ).show()
                 pendingAction = null
@@ -88,7 +90,7 @@ class HomeActivity : AppCompatActivity() {
             .takeIf { it != 0 }
             ?: resources.getIdentifier("ic_settings_24", "drawable", packageName)
         if (navIconRes != 0) binding.toolbar.setNavigationIcon(navIconRes)
-        binding.toolbar.title = "WorkWave"
+        binding.toolbar.title = getString(R.string.home_title)
         binding.toolbar.setNavigationOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
@@ -114,6 +116,7 @@ class HomeActivity : AppCompatActivity() {
 
         setupWeekStrip()
         setupTodayTexts()
+        applySettingsToUi()
 
         binding.btnStart.setOnClickListener {
             pendingAction = Action.START
@@ -138,15 +141,32 @@ class HomeActivity : AppCompatActivity() {
         lifecycleScope.launch { loadOpenSessionAndRender() }
     }
 
+    override fun onResume() {
+        super.onResume()
+        applySettingsToUi()
+    }
+
+    private fun applySettingsToUi() {
+        val use24 = settingsPrefs.getBoolean("time_24h", true)
+        if (use24) {
+            binding.tcTime.format24Hour = "HH:mm"
+            binding.tcTime.format12Hour = null
+        } else {
+            binding.tcTime.format24Hour = null
+            binding.tcTime.format12Hour = "hh:mm a"
+        }
+        setupTodayTexts()
+    }
+
     private fun showHomeTab() {
-        binding.toolbar.title = "WorkWave"
+        binding.toolbar.title = getString(R.string.home_title)
         binding.homeContent.visibility = View.VISIBLE
         binding.incCalendar.root.visibility = View.GONE
         binding.incEmployees.root.visibility = View.GONE
     }
 
     private fun showCalendarTab() {
-        binding.toolbar.title = "Календарь"
+        binding.toolbar.title = getString(R.string.calendar_title)
         binding.homeContent.visibility = View.GONE
         binding.incCalendar.root.visibility = View.VISIBLE
         binding.incEmployees.root.visibility = View.GONE
@@ -154,7 +174,7 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun showEmployeesTab() {
-        binding.toolbar.title = "Сотрудники"
+        binding.toolbar.title = getString(R.string.employees_title)
         binding.homeContent.visibility = View.GONE
         binding.incCalendar.root.visibility = View.GONE
         binding.incEmployees.root.visibility = View.VISIBLE
@@ -218,27 +238,39 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
+    private fun openEmployee(targetUserId: Long) {
+        val canEdit = isHr || (targetUserId == userId)
+
+        profileLauncher.launch(
+            Intent(this, ProfileActivity::class.java)
+                .putExtra("userId", targetUserId)
+                .putExtra("editable", canEdit)
+                .putExtra("hrMode", isHr)
+                .putExtra("ownProfile", targetUserId == userId)
+        )
+    }
+
     private fun toggleDeleteMode() {
         if (!isHr) return
         isDeleteMode = !isDeleteMode
         val btn = binding.incEmployees.btnDeleteEmployee
-        btn.text = if (isDeleteMode) "Отменить удаление" else "Удалить"
+        btn.text = if (isDeleteMode) getString(R.string.delete_cancel) else getString(R.string.delete)
         val msg = if (isDeleteMode) {
-            "Нажмите на сотрудника, которого хотите удалить"
+            getString(R.string.delete_mode_on)
         } else {
-            "Режим удаления выключен"
+            getString(R.string.delete_mode_off)
         }
         Snackbar.make(binding.root, msg, Snackbar.LENGTH_SHORT).show()
     }
 
     private fun confirmDeleteEmployee(user: UserWithNames) {
         AlertDialog.Builder(this)
-            .setTitle("Удалить сотрудника?")
-            .setMessage("Удалить ${user.email} из списка сотрудников?")
-            .setPositiveButton("Удалить") { _, _ ->
+            .setTitle(getString(R.string.delete_employee_title))
+            .setMessage(getString(R.string.delete_employee_message, user.email))
+            .setPositiveButton(getString(R.string.delete)) { _, _ ->
                 lifecycleScope.launch { deleteEmployee(user) }
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 
@@ -246,9 +278,9 @@ class HomeActivity : AppCompatActivity() {
         FirebaseEmployees.deleteEmployeeByUserId(user.userId)
 
         isDeleteMode = false
-        binding.incEmployees.btnDeleteEmployee.text = "Удалить"
+        binding.incEmployees.btnDeleteEmployee.text = getString(R.string.delete)
 
-        Snackbar.make(binding.root, "Сотрудник удалён из списка", Snackbar.LENGTH_SHORT).show()
+        Snackbar.make(binding.root, getString(R.string.employee_removed_from_list), Snackbar.LENGTH_SHORT).show()
     }
 
     private fun showAddEmployeeDialog() {
@@ -272,14 +304,14 @@ class HomeActivity : AppCompatActivity() {
                 }
 
                 if (candidates.isEmpty()) {
-                    Snackbar.make(binding.root, "Нет сотрудников для добавления", Snackbar.LENGTH_LONG).show()
+                    Snackbar.make(binding.root, getString(R.string.no_employees_to_add), Snackbar.LENGTH_LONG).show()
                     return@addOnSuccessListener
                 }
 
                 val labels = candidates.map { it.email }.toTypedArray()
 
                 AlertDialog.Builder(this)
-                    .setTitle("Выберите сотрудника для добавления")
+                    .setTitle(getString(R.string.choose_employee_to_add))
                     .setItems(labels) { _, which ->
                         val u = candidates[which]
                         lifecycleScope.launch {
@@ -293,31 +325,19 @@ class HomeActivity : AppCompatActivity() {
                                 email = u.email
                             )
                             FirebaseEmployees.upsertEmployee(emp)
-                            Snackbar.make(binding.root, "Сотрудник добавлен", Snackbar.LENGTH_SHORT).show()
+                            Snackbar.make(binding.root, getString(R.string.employee_added), Snackbar.LENGTH_SHORT).show()
                         }
                     }
-                    .setNegativeButton("Отмена", null)
+                    .setNegativeButton(getString(R.string.cancel), null)
                     .show()
             }
             .addOnFailureListener { e ->
                 Snackbar.make(
                     binding.root,
-                    "Ошибка загрузки списка пользователей: ${e.localizedMessage ?: "неизвестная"}",
+                    getString(R.string.error_loading_users, e.localizedMessage ?: "unknown"),
                     Snackbar.LENGTH_LONG
                 ).show()
             }
-    }
-
-    private fun openEmployee(targetUserId: Long) {
-        val canEdit = isHr || (targetUserId == userId)
-
-        profileLauncher.launch(
-            Intent(this, ProfileActivity::class.java)
-                .putExtra("userId", targetUserId)
-                .putExtra("editable", canEdit)
-                .putExtra("hrMode", isHr)
-                .putExtra("ownProfile", targetUserId == userId)
-        )
     }
 
     private fun setupWeekStrip() {
@@ -353,14 +373,14 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun setupTodayTexts() {
-        val ru = Locale("ru", "RU")
-        val fmt = SimpleDateFormat("EEEE, d MMMM", ru)
-        binding.tvDate.text = fmt.format(Date())
+        val pattern = settingsPrefs.getString("date_format", "EEEE, d MMMM") ?: "EEEE, d MMMM"
+        val df = SimpleDateFormat(pattern, Locale.getDefault())
+        binding.tvDate.text = df.format(Date())
     }
 
     private fun updateSelectedDateText(dayMillis: Long) {
-        val ru = Locale("ru", "RU")
-        val df = SimpleDateFormat("EEEE, d MMMM yyyy", ru)
+        val pattern = settingsPrefs.getString("date_format", "EEEE, d MMMM") ?: "EEEE, d MMMM"
+        val df = SimpleDateFormat(pattern, Locale.getDefault())
         binding.incCalendar.tvSelectedDate.text = df.format(Date(dayMillis))
     }
 
@@ -460,7 +480,7 @@ class HomeActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 Snackbar.make(
                     binding.root,
-                    "Ошибка сканирования: ${e.localizedMessage ?: "неизвестная ошибка"}",
+                    getString(R.string.scan_error, e.localizedMessage ?: "unknown"),
                     Snackbar.LENGTH_LONG
                 ).show()
                 pendingAction = null
@@ -472,7 +492,7 @@ class HomeActivity : AppCompatActivity() {
 
         val officeId = parseOfficeId(qr)
         if (officeId == null) {
-            Snackbar.make(binding.root, "Некорректный QR-код", Snackbar.LENGTH_LONG).show()
+            Snackbar.make(binding.root, getString(R.string.invalid_qr), Snackbar.LENGTH_LONG).show()
             return
         }
 
@@ -483,7 +503,7 @@ class HomeActivity : AppCompatActivity() {
         }
         if (existing != null) {
             openSession = existing
-            Snackbar.make(binding.root, "Смена уже начата", Snackbar.LENGTH_SHORT).show()
+            Snackbar.make(binding.root, getString(R.string.shift_already_started), Snackbar.LENGTH_SHORT).show()
             renderState()
             return
         }
@@ -500,7 +520,7 @@ class HomeActivity : AppCompatActivity() {
         }
 
         openSession = session
-        Snackbar.make(binding.root, "Смена начата", Snackbar.LENGTH_SHORT).show()
+        Snackbar.make(binding.root, getString(R.string.shift_started), Snackbar.LENGTH_SHORT).show()
         renderState()
     }
 
@@ -509,7 +529,7 @@ class HomeActivity : AppCompatActivity() {
 
         val officeId = parseOfficeId(qr)
         if (officeId == null) {
-            Snackbar.make(binding.root, "Некорректный QR-код", Snackbar.LENGTH_LONG).show()
+            Snackbar.make(binding.root, getString(R.string.invalid_qr), Snackbar.LENGTH_LONG).show()
             return
         }
 
@@ -520,14 +540,14 @@ class HomeActivity : AppCompatActivity() {
         }
 
         if (open == null) {
-            Snackbar.make(binding.root, "Нет активной смены", Snackbar.LENGTH_LONG).show()
+            Snackbar.make(binding.root, getString(R.string.no_active_shift), Snackbar.LENGTH_LONG).show()
             return
         }
 
         if (!open.officeId.isNullOrEmpty() && open.officeId != officeId) {
             Snackbar.make(
                 binding.root,
-                "Сканирован неверный QR-код (должен быть тот же, что при входе)",
+                getString(R.string.wrong_qr_for_finish),
                 Snackbar.LENGTH_LONG
             ).show()
             return
@@ -539,7 +559,7 @@ class HomeActivity : AppCompatActivity() {
         }
 
         openSession = null
-        Snackbar.make(binding.root, "Смена завершена", Snackbar.LENGTH_SHORT).show()
+        Snackbar.make(binding.root, getString(R.string.shift_finished), Snackbar.LENGTH_SHORT).show()
         renderState()
     }
 

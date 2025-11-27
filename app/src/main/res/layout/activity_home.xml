@@ -10,9 +10,9 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="?attr/colorSurface"
-        android:paddingStart="24dp"
-        android:paddingEnd="24dp"
-        app:title="WorkWave"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        app:title="@string/home_title"
         app:titleCentered="true"
         app:menu="@menu/menu_top_home" />
 
@@ -31,7 +31,6 @@
 
             <TextView
                 android:id="@+id/tvMonth"
-                android:text="декабрь"
                 android:textStyle="bold"
                 android:textSize="16sp"
                 android:layout_marginTop="8dp"
@@ -44,48 +43,20 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <TextView
-                    android:text="пн"
-                    android:textSize="12sp"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:text="вт"
-                    android:textSize="12sp"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:text="ср"
-                    android:textSize="12sp"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:text="чт"
-                    android:textSize="12sp"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:text="пт"
-                    android:textSize="12sp"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:text="сб"
-                    android:textSize="12sp"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:text="вс"
-                    android:textSize="12sp"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                <TextView android:text="@string/week_mon" android:textSize="12sp" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:text="@string/week_tue" android:textSize="12sp" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:text="@string/week_wed" android:textSize="12sp" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:text="@string/week_thu" android:textSize="12sp" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:text="@string/week_fri" android:textSize="12sp" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:text="@string/week_sat" android:textSize="12sp" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:text="@string/week_sun" android:textSize="12sp" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
             </LinearLayout>
 
             <LinearLayout
@@ -94,55 +65,20 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/tvN1"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:id="@+id/tvN2"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:id="@+id/tvN3"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:id="@+id/tvN4"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:id="@+id/tvN5"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:id="@+id/tvN6"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView
-                    android:id="@+id/tvN7"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="8dp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                <TextView android:id="@+id/tvN1" android:textSize="12sp" android:textStyle="bold" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:id="@+id/tvN2" android:textSize="12sp" android:textStyle="bold" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:id="@+id/tvN3" android:textSize="12sp" android:textStyle="bold" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:id="@+id/tvN4" android:textSize="12sp" android:textStyle="bold" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:id="@+id/tvN5" android:textSize="12sp" android:textStyle="bold" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:id="@+id/tvN6" android:textSize="12sp" android:textStyle="bold" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <TextView android:id="@+id/tvN7" android:textSize="12sp" android:textStyle="bold" android:paddingHorizontal="8dp"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"/>
             </LinearLayout>
 
             <TextClock
@@ -156,7 +92,6 @@
 
             <TextView
                 android:id="@+id/tvDate"
-                android:text="понедельник, 1 декабря"
                 android:textSize="14sp"
                 android:layout_marginTop="4dp"
                 android:layout_width="wrap_content"
@@ -165,7 +100,7 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStart"
                 style="@style/WorkWave.BlueRoundedButton"
-                android:text="начать"
+                android:text="@string/btn_start_shift"
                 android:layout_marginTop="16dp"
                 android:layout_width="220dp"
                 android:layout_height="wrap_content" />
@@ -177,27 +112,27 @@
                 android:textStyle="bold"
                 android:layout_marginTop="16dp"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"/>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFinish"
                 style="@style/WorkWave.BlueRoundedButton"
-                android:text="завершить"
+                android:text="@string/btn_finish_shift"
                 android:visibility="gone"
                 android:layout_marginTop="12dp"
                 android:layout_width="220dp"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"/>
         </LinearLayout>
 
         <include
             android:id="@+id/incCalendar"
             layout="@layout/view_calendar_content"
-            android:visibility="gone" />
+            android:visibility="gone"/>
 
         <include
             android:id="@+id/incEmployees"
             layout="@layout/view_employees_content"
-            android:visibility="gone" />
+            android:visibility="gone"/>
     </FrameLayout>
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
@@ -205,5 +140,4 @@
         android:layout_width="match_parent"
         android:layout_height="64dp"
         app:menu="@menu/menu_bottom_home" />
-
 </LinearLayout>

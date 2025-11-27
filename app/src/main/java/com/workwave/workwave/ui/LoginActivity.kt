@@ -1,11 +1,11 @@
 package com.workwave.workwave.ui
 
-import android.content.Intent
 import android.os.Bundle
 import android.util.Patterns
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Intent
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
+import com.workwave.workwave.R
 import com.workwave.workwave.data.AppDatabase
 import com.workwave.workwave.data.UserEntity
 import com.workwave.workwave.databinding.ActivityLoginBinding
@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class LoginActivity : AppCompatActivity() {
+class LoginActivity : BaseActivity() {
 
     private lateinit var binding: ActivityLoginBinding
 
@@ -26,8 +26,10 @@ class LoginActivity : AppCompatActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.btnLogin.setText(R.string.btn_login)
         binding.btnLogin.setOnClickListener { login() }
 
+        binding.tvForgot.setText(R.string.login_register_prompt)
         binding.tvForgot.setOnClickListener {
             startActivity(
                 Intent(this, RegisterActivity::class.java)
@@ -44,11 +46,11 @@ class LoginActivity : AppCompatActivity() {
         binding.tilPassword.error = null
 
         if (!Patterns.EMAIL_ADDRESS.matcher(emailRaw).matches()) {
-            binding.tilEmail.error = "Некорректная почта"
+            binding.tilEmail.error = getString(R.string.login_error_invalid_email)
             return
         }
         if (password.isEmpty()) {
-            binding.tilPassword.error = "Введите пароль"
+            binding.tilPassword.error = getString(R.string.login_error_empty_password)
             return
         }
 
@@ -73,11 +75,7 @@ class LoginActivity : AppCompatActivity() {
             }
 
             if (user == null) {
-                Snackbar.make(
-                    binding.root,
-                    "Пользователь не найден. Зарегистрируйтесь.",
-                    Snackbar.LENGTH_LONG
-                ).show()
+                Snackbar.make(binding.root, getString(R.string.login_user_not_found), Snackbar.LENGTH_LONG).show()
                 return@launch
             }
 
@@ -94,7 +92,7 @@ class LoginActivity : AppCompatActivity() {
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 )
             } else {
-                Snackbar.make(binding.root, "Неверный пароль", Snackbar.LENGTH_LONG).show()
+                Snackbar.make(binding.root, getString(R.string.login_wrong_password), Snackbar.LENGTH_LONG).show()
             }
         }
     }

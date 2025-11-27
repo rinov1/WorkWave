@@ -7,8 +7,8 @@ import android.os.Bundle
 import android.util.Patterns
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.workwave.workwave.R
 import com.workwave.workwave.data.AppDatabase
 import com.workwave.workwave.data.EmployeeEntity
 import com.workwave.workwave.data.UserEntity
@@ -17,12 +17,9 @@ import com.workwave.workwave.firebase.FirebaseEmployees
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
-class ProfileActivity : AppCompatActivity() {
+class ProfileActivity : BaseActivity() {
 
     private lateinit var binding: ActivityProfileBinding
     private var userId: Long = -1L
@@ -58,9 +55,10 @@ class ProfileActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener {
             onBackPressedDispatcher.onBackPressed()
         }
+
         binding.toolbar.setOnMenuItemClickListener {
             when (it.itemId) {
-                com.workwave.workwave.R.id.action_edit -> {
+                R.id.action_edit -> {
                     if (!canEditProfile) return@setOnMenuItemClickListener true
                     if (!editMode) setEditMode(true) else saveIfValid()
                     true
@@ -69,7 +67,7 @@ class ProfileActivity : AppCompatActivity() {
             }
         }
 
-        binding.toolbar.menu.findItem(com.workwave.workwave.R.id.action_edit)?.isVisible =
+        binding.toolbar.menu.findItem(R.id.action_edit)?.isVisible =
             canEditProfile
 
         binding.ivAvatar.setOnClickListener {
@@ -123,7 +121,8 @@ class ProfileActivity : AppCompatActivity() {
         binding.tvTenure.text = tenureText(e.hireDate)
         binding.tvHireDate.text = formatHireDate(e.hireDate)
 
-        binding.tvStatus.text = if (e.onVacation) "В отпуске" else "Работает"
+        binding.tvStatus.text =
+            if (e.onVacation) getString(R.string.status_vacation) else getString(R.string.status_working)
         binding.swVacation.isChecked = e.onVacation
 
         if (!e.avatarUri.isNullOrEmpty()) {
@@ -137,33 +136,45 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun tenureText(hireDate: Long?): String {
-        if (hireDate == null || hireDate <= 0) return "-"
+        if (hireDate == null || hireDate <= 0) return getString(R.string.tenure_less_than_year)
         val now = Calendar.getInstance().timeInMillis
         val years = ((now - hireDate) / (365.25 * 24 * 60 * 60 * 1000)).toInt()
-        return if (years <= 0) "меньше года" else "$years лет"
+        return if (years <= 0) {
+            getString(R.string.tenure_less_than_year)
+        } else {
+            getString(R.string.tenure_years, years)
+        }
     }
 
     private fun formatHireDate(hireDate: Long?): String {
         if (hireDate == null || hireDate <= 0) return "-"
-        val df = SimpleDateFormat("d MMM yyyy", Locale("ru", "RU"))
-        return df.format(Date(hireDate))
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = hireDate
+        val y = cal.get(Calendar.YEAR)
+        val m = cal.get(Calendar.MONTH) + 1
+        val d = cal.get(Calendar.DAY_OF_MONTH)
+        return String.format("%02d.%02d.%04d", d, m, y)
     }
 
     private fun setEditMode(enabled: Boolean) {
         if (enabled && !canEditProfile) return
 
         editMode = enabled
-        binding.toolbar.menu.findItem(com.workwave.workwave.R.id.action_edit)?.title =
-            if (enabled) "Сохранить" else "Изменить"
+        binding.toolbar.menu.findItem(R.id.action_edit)?.title =
+            if (enabled) getString(R.string.profile_menu_save) else getString(R.string.profile_menu_edit)
 
         binding.tvFullName.visibility = if (enabled) View.GONE else View.VISIBLE
         binding.groupEditName.visibility = if (enabled) View.VISIBLE else View.GONE
 
-        binding.tvPhone.visibility = if (enabled) View.GONE else View.VISIBLE
-        binding.tilPhone.visibility = if (enabled) View.VISIBLE else View.GONE
+        binding.tvPhone.visibility =
+            if (enabled) View.GONE else View.VISIBLE
+        binding.tilPhone.visibility =
+            if (enabled) View.VISIBLE else View.GONE
 
-        binding.tvEmail.visibility = if (enabled) View.GONE else View.VISIBLE
-        binding.tilEmail.visibility = if (enabled) View.VISIBLE else View.GONE
+        binding.tvEmail.visibility =
+            if (enabled) View.GONE else View.VISIBLE
+        binding.tilEmail.visibility =
+            if (enabled) View.VISIBLE else View.GONE
 
         if (isHr) {
             if (enabled) {
@@ -199,7 +210,7 @@ class ProfileActivity : AppCompatActivity() {
         val email = binding.etEmail.text?.toString()?.trim().orEmpty()
 
         if (email.isNotEmpty() && !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            binding.tilEmail.error = "Некорректный email"
+            binding.tilEmail.error = getString(R.string.profile_invalid_email)
             return
         }
         binding.tilEmail.error = null

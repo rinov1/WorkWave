@@ -1,3 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+
     <string name="app_name">WorkWave</string>
+
+    <string name="home_title">WorkWave</string>
+    <string name="calendar_title">Календарь</string>
+    <string name="employees_title">Сотрудники</string>
+    <string name="settings_title">Настройки</string>
+    <string name="profile_title">Профиль</string>
+
+    <string name="btn_login">Войти</string>
+    <string name="btn_register">Зарегистрироваться</string>
+    <string name="btn_start_shift">Начать</string>
+    <string name="btn_finish_shift">Завершить</string>
+    <string name="btn_logout">Выйти из аккаунта</string>
+
+    <string name="hint_email">Почта</string>
+    <string name="hint_password">Пароль</string>
+    <string name="login_register_prompt">Нет аккаунта? Зарегистрируйтесь</string>
+
+    <string name="settings_dark_theme">Тёмная тема</string>
+    <string name="settings_time_24h">24‑часовой формат времени</string>
+    <string name="settings_date_format">Формат даты</string>
+    <string name="settings_language">Язык приложения</string>
+    <string name="time_format_changed">Формат времени изменён</string>
+
+    <string name="lang_ru">Русский</string>
+    <string name="lang_en">English</string>
+    <string name="lang_ko">한국어 (Korean)</string>
+
+    <string name="week_mon">пн</string>
+    <string name="week_tue">вт</string>
+    <string name="week_wed">ср</string>
+    <string name="week_thu">чт</string>
+    <string name="week_fri">пт</string>
+    <string name="week_sat">сб</string>
+    <string name="week_sun">вс</string>
+
+    <string name="profile_first_name">Имя</string>
+    <string name="profile_last_name">Фамилия</string>
+    <string name="profile_position">Должность</string>
+    <string name="profile_tenure">Стаж</string>
+    <string name="profile_status">Статус</string>
+    <string name="profile_phone">Телефон</string>
+    <string name="profile_email">Email</string>
+    <string name="profile_hire_date_label">Дата найма:</string>
+
+    <string name="profile_menu_edit">Изменить</string>
+    <string name="profile_menu_save">Сохранить</string>
+    <string name="profile_invalid_email">Некорректный email</string>
+
+    <string name="tenure_less_than_year">меньше года</string>
+    <string name="tenure_years">%1$d лет</string>
+
+    <string name="status_working">Работает</string>
+    <string name="status_vacation">В отпуске</string>
+
+    <string name="delete">Удалить</string>
+    <string name="delete_cancel">Отменить удаление</string>
+    <string name="cancel">Отмена</string>
+    <string name="delete_mode_on">Нажмите на сотрудника, которого хотите удалить</string>
+    <string name="delete_mode_off">Режим удаления выключен</string>
+    <string name="delete_employee_title">Удалить сотрудника?</string>
+    <string name="delete_employee_message">Удалить %1$s из списка сотрудников?</string>
+    <string name="employee_removed_from_list">Сотрудник удалён из списка</string>
+    <string name="no_employees_to_add">Нет сотрудников для добавления</string>
+    <string name="choose_employee_to_add">Выберите сотрудника для добавления</string>
+    <string name="employee_added">Сотрудник добавлен</string>
+
+    <string name="error_loading_users">Ошибка загрузки списка пользователей: %1$s</string>
+    <string name="scan_error">Ошибка сканирования: %1$s</string>
+    <string name="invalid_qr">Некорректный QR‑код</string>
+    <string name="camera_permission_denied">Дайте доступ к камере для сканирования QR</string>
+
+    <string name="shift_already_started">Смена уже начата</string>
+    <string name="shift_started">Смена начата</string>
+    <string name="no_active_shift">Нет активной смены</string>
+    <string name="wrong_qr_for_finish">Сканирован неверный QR‑код (должен быть тот же, что при входе)</string>
+    <string name="shift_finished">Смена завершена</string>
+
+    <string name="login_error_invalid_email">Некорректная почта</string>
+    <string name="login_error_empty_password">Введите пароль</string>
+    <string name="login_user_not_found">Пользователь не найден. Зарегистрируйтесь.</string>
+    <string name="login_wrong_password">Неверный пароль</string>
+
 </resources>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">WorkWave</string>
+
+    <string name="home_title">WorkWave</string>
+    <string name="calendar_title">캘린더</string>
+    <string name="employees_title">직원</string>
+    <string name="settings_title">설정</string>
+    <string name="profile_title">프로필</string>
+
+    <string name="btn_login">로그인</string>
+    <string name="btn_register">회원가입</string>
+    <string name="btn_start_shift">근무 시작</string>
+    <string name="btn_finish_shift">근무 종료</string>
+    <string name="btn_logout">로그아웃</string>
+
+    <string name="hint_email">이메일</string>
+    <string name="hint_password">비밀번호</string>
+    <string name="login_register_prompt">계정이 없나요? 가입하기</string>
+
+    <string name="settings_dark_theme">다크 테마</string>
+    <string name="settings_time_24h">24시간 형식</string>
+    <string name="settings_date_format">날짜 형식</string>
+    <string name="settings_language">앱 언어</string>
+    <string name="time_format_changed">시간 형식이 변경되었습니다</string>
+
+    <string name="lang_ru">Русский</string>
+    <string name="lang_en">English</string>
+    <string name="lang_ko">한국어 (Korean)</string>
+
+    <string name="week_mon">월</string>
+    <string name="week_tue">화</string>
+    <string name="week_wed">수</string>
+    <string name="week_thu">목</string>
+    <string name="week_fri">금</string>
+    <string name="week_sat">토</string>
+    <string name="week_sun">일</string>
+
+    <string name="profile_first_name">이름</string>
+    <string name="profile_last_name">성</string>
+    <string name="profile_position">직책</string>
+    <string name="profile_tenure">근속 연수</string>
+    <string name="profile_status">상태</string>
+    <string name="profile_phone">전화번호</string>
+    <string name="profile_email">이메일</string>
+    <string name="profile_hire_date_label">입사일:</string>
+
+    <string name="profile_menu_edit">편집</string>
+    <string name="profile_menu_save">저장</string>
+    <string name="profile_invalid_email">잘못된 이메일입니다</string>
+
+    <string name="tenure_less_than_year">1년 미만</string>
+    <string name="tenure_years">%1$d년</string>
+
+    <string name="status_working">근무 중</string>
+    <string name="status_vacation">휴가 중</string>
+
+    <string name="delete">삭제</string>
+    <string name="delete_cancel">삭제 취소</string>
+    <string name="cancel">취소</string>
+    <string name="delete_mode_on">삭제할 직원을 선택하세요</string>
+    <string name="delete_mode_off">삭제 모드가 꺼졌습니다</string>
+    <string name="delete_employee_title">직원 삭제</string>
+    <string name="delete_employee_message">%1$s 직원을 목록에서 삭제할까요?</string>
+    <string name="employee_removed_from_list">직원이 목록에서 삭제되었습니다</string>
+    <string name="no_employees_to_add">추가할 직원이 없습니다</string>
+    <string name="choose_employee_to_add">추가할 직원을 선택하세요</string>
+    <string name="employee_added">직원이 추가되었습니다</string>
+
+    <string name="error_loading_users">사용자 목록을 불러오는 중 오류: %1$s</string>
+    <string name="scan_error">스캔 오류: %1$s</string>
+    <string name="invalid_qr">잘못된 QR 코드입니다</string>
+    <string name="camera_permission_denied">QR 스캔을 위해 카메라 접근을 허용하세요</string>
+
+    <string name="shift_already_started">근무가 이미 시작되었습니다</string>
+    <string name="shift_started">근무가 시작되었습니다</string>
+    <string name="no_active_shift">활성 근무가 없습니다</string>
+    <string name="wrong_qr_for_finish">종료 시 잘못된 QR 코드입니다</string>
+    <string name="shift_finished">근무가 종료되었습니다</string>
+
+    <string name="login_error_invalid_email">잘못된 이메일입니다</string>
+    <string name="login_error_empty_password">비밀번호를 입력하세요</string>
+    <string name="login_user_not_found">사용자를 찾을 수 없습니다. 가입하세요.</string>
+    <string name="login_wrong_password">비밀번호가 올바르지 않습니다</string>
+
+</resources>
