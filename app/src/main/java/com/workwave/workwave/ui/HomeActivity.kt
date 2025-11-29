@@ -15,10 +15,12 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.snackbar.Snackbar
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.workwave.workwave.R
@@ -55,7 +57,23 @@ class HomeActivity : BaseActivity() {
 
     private var allEmployees: List<UserWithNames> = emptyList()
 
+    // Статус членства текущего пользователя
+    private var isEmployeeActive: Boolean = true
+    private var myMembershipReg: ListenerRegistration? = null
+    private val membershipPrefs by lazy {
+        getSharedPreferences("membership", MODE_PRIVATE)
+    }
+
+    // Активные userId (для HR фильтрации смен)
+    private var activeUserIds: Set<Long> = emptySet()
+
+    // Последний выбранный день календаря
+    private var selectedDayMillis: Long = 0L
+
     private enum class Action { START, FINISH }
+    private enum class EmployeesSort { NAME, DATE }
+
+    private var employeesSort: EmployeesSort = EmployeesSort.NAME
 
     private val settingsPrefs by lazy {
         getSharedPreferences("settings", MODE_PRIVATE)
@@ -106,12 +124,27 @@ class HomeActivity : BaseActivity() {
             } else false
         }
 
+        // Слушаем список активных сотрудников (для HR и сотрудников с доступом)
         FirebaseEmployees.listenEmployees { list ->
             allEmployees = list
-            if (::employeesAdapter.isInitialized) {
-                employeesAdapter.submitList(list)
+            activeUserIds = list.map { it.userId }.toSet()
+            applyEmployeesSort()
+            refreshCalendarForMembershipChange()
+        }
+
+        // Слушаем свой статус (только если не HR)
+        if (!isHr && userId > 0) {
+            myMembershipReg = FirebaseEmployees.listenEmployeeActive(userId) { active ->
+                onMyMembershipChanged(active)
             }
-            sessionsAdapter.updateUsers(list.associateBy { it.userId })
+            // Первичная установка видимости People на основании локального кэша
+            val cached = membershipPrefs.getBoolean("active_$userId", true)
+            isEmployeeActive = cached
+            updatePeopleTabVisibility()
+        } else {
+            // HR всегда видит вкладку Employees
+            isEmployeeActive = true
+            updatePeopleTabVisibility()
         }
 
         setupWeekStrip()
@@ -132,7 +165,13 @@ class HomeActivity : BaseActivity() {
             when (item.itemId) {
                 R.id.nav_home     -> { showHomeTab(); true }
                 R.id.nav_calendar -> { showCalendarTab(); true }
-                R.id.nav_people   -> { showEmployeesTab(); true }
+                R.id.nav_people   -> {
+                    if (!binding.bottomNav.menu.findItem(R.id.nav_people).isVisible) {
+                        showHomeTab(); false
+                    } else {
+                        showEmployeesTab(); true
+                    }
+                }
                 else -> false
             }
         }
@@ -141,9 +180,40 @@ class HomeActivity : BaseActivity() {
         lifecycleScope.launch { loadOpenSessionAndRender() }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        myMembershipReg?.remove()
+    }
+
     override fun onResume() {
         super.onResume()
         applySettingsToUi()
+    }
+
+    private fun onMyMembershipChanged(active: Boolean) {
+        val key = "active_$userId"
+        val prev = membershipPrefs.getAll()[key] as? Boolean
+        if (prev != null && prev != active) {
+            if (!active) {
+                Snackbar.make(binding.root, getString(R.string.emp_you_were_removed), Snackbar.LENGTH_LONG).show()
+            } else {
+                Snackbar.make(binding.root, getString(R.string.emp_you_were_added), Snackbar.LENGTH_LONG).show()
+            }
+        }
+        membershipPrefs.edit().putBoolean(key, active).apply()
+        isEmployeeActive = active
+        updatePeopleTabVisibility()
+        refreshCalendarForMembershipChange()
+    }
+
+    private fun updatePeopleTabVisibility() {
+        val visible = isHr || isEmployeeActive
+        val item = binding.bottomNav.menu.findItem(R.id.nav_people)
+        item.isVisible = visible
+        if (!visible && binding.bottomNav.selectedItemId == R.id.nav_people) {
+            binding.bottomNav.selectedItemId = R.id.nav_home
+            showHomeTab()
+        }
     }
 
     private fun applySettingsToUi() {
@@ -156,6 +226,42 @@ class HomeActivity : BaseActivity() {
             binding.tcTime.format12Hour = "hh:mm a"
         }
         setupTodayTexts()
+    }
+
+    private fun sortEmployeesByName(list: List<UserWithNames>): List<UserWithNames> {
+        val loc = Locale.getDefault()
+
+        fun UserWithNames.displayNameLower(): String {
+            val name = when {
+                !firstName.isNullOrBlank() && !lastName.isNullOrBlank() -> "$firstName $lastName"
+                !firstName.isNullOrBlank() -> firstName!!
+                !lastName.isNullOrBlank() -> lastName!!
+                else -> email
+            }
+            return name.lowercase(loc)
+        }
+
+        return list.sortedWith(
+            compareBy<UserWithNames>(
+                { it.displayNameLower() },
+                { it.email.lowercase(loc) }
+            )
+        )
+    }
+
+    private fun sortEmployeesByDate(list: List<UserWithNames>): List<UserWithNames> {
+        return list.sortedBy { it.createdAt }
+    }
+
+    private fun applyEmployeesSort() {
+        val sorted = when (employeesSort) {
+            EmployeesSort.NAME -> sortEmployeesByName(allEmployees)
+            EmployeesSort.DATE -> sortEmployeesByDate(allEmployees)
+        }
+        if (::employeesAdapter.isInitialized) {
+            employeesAdapter.submitList(sorted)
+        }
+        sessionsAdapter.updateUsers(sorted.associateBy { it.userId })
     }
 
     private fun showHomeTab() {
@@ -187,16 +293,18 @@ class HomeActivity : BaseActivity() {
 
         val today = Calendar.getInstance()
         binding.incCalendar.calendarView.date = today.timeInMillis
-        updateSelectedDateText(today.timeInMillis)
-        loadSessionsForDay(today.timeInMillis)
+        selectedDayMillis = today.timeInMillis
+        updateSelectedDateText(selectedDayMillis)
+        loadSessionsForDay(selectedDayMillis)
 
         binding.incCalendar.calendarView.setOnDateChangeListener { _, y, m, d ->
             val cal = Calendar.getInstance().apply {
                 set(y, m, d, 0, 0, 0)
                 set(Calendar.MILLISECOND, 0)
             }
-            updateSelectedDateText(cal.timeInMillis)
-            loadSessionsForDay(cal.timeInMillis)
+            selectedDayMillis = cal.timeInMillis
+            updateSelectedDateText(selectedDayMillis)
+            loadSessionsForDay(selectedDayMillis)
         }
     }
 
@@ -207,11 +315,9 @@ class HomeActivity : BaseActivity() {
         binding.incEmployees.rvEmployees.layoutManager = LinearLayoutManager(this)
         binding.incEmployees.rvEmployees.adapter = employeesAdapter
 
-        if (allEmployees.isNotEmpty()) {
-            employeesAdapter.submitList(allEmployees)
-        }
-
+        applyEmployeesSort()
         setupEmployeesButtons()
+        setupSortButtons()
     }
 
     private fun setupEmployeesButtons() {
@@ -228,6 +334,30 @@ class HomeActivity : BaseActivity() {
             addBtn.setOnClickListener { showAddEmployeeDialog() }
             delBtn.setOnClickListener { toggleDeleteMode() }
         }
+    }
+
+    private fun setupSortButtons() {
+        val btnName = binding.incEmployees.btnSortName
+        val btnDate = binding.incEmployees.btnSortDate
+
+        fun updateState() {
+            btnName.isEnabled = employeesSort != EmployeesSort.NAME
+            btnDate.isEnabled = employeesSort != EmployeesSort.DATE
+        }
+
+        btnName.setOnClickListener {
+            employeesSort = EmployeesSort.NAME
+            applyEmployeesSort()
+            updateState()
+        }
+
+        btnDate.setOnClickListener {
+            employeesSort = EmployeesSort.DATE
+            applyEmployeesSort()
+            updateState()
+        }
+
+        updateState()
     }
 
     private fun onEmployeeClicked(user: UserWithNames) {
@@ -276,11 +406,11 @@ class HomeActivity : BaseActivity() {
 
     private suspend fun deleteEmployee(user: UserWithNames) {
         FirebaseEmployees.deleteEmployeeByUserId(user.userId)
-
         isDeleteMode = false
         binding.incEmployees.btnDeleteEmployee.text = getString(R.string.delete)
-
         Snackbar.make(binding.root, getString(R.string.employee_removed_from_list), Snackbar.LENGTH_SHORT).show()
+        // обновим календарь — сработает и через слушатель, но сделаем мгновенно
+        refreshCalendarForMembershipChange()
     }
 
     private fun showAddEmployeeDialog() {
@@ -324,8 +454,10 @@ class HomeActivity : BaseActivity() {
                                 userId = u.userId,
                                 email = u.email
                             )
-                            FirebaseEmployees.upsertEmployee(emp)
+                            FirebaseEmployees.upsertEmployee(emp) // активируем сотрудника
                             Snackbar.make(binding.root, getString(R.string.employee_added), Snackbar.LENGTH_SHORT).show()
+                            // обновим календарь
+                            refreshCalendarForMembershipChange()
                         }
                     }
                     .setNegativeButton(getString(R.string.cancel), null)
@@ -357,6 +489,10 @@ class HomeActivity : BaseActivity() {
         val monday = cal.clone() as Calendar
         monday.add(Calendar.DAY_OF_MONTH, -dayOfWeek)
 
+        // Цвета из темы (видимые в тёмной/светлой теме)
+        val defaultTextColor = MaterialColors.getColor(binding.root, com.google.android.material.R.attr.colorOnSurface)
+        val todayTextColor = MaterialColors.getColor(binding.root, com.google.android.material.R.attr.colorOnPrimary)
+
         tvs.forEachIndexed { i, tv ->
             val d = monday.clone() as Calendar
             d.add(Calendar.DAY_OF_MONTH, i)
@@ -364,10 +500,10 @@ class HomeActivity : BaseActivity() {
 
             if (i == dayOfWeek) {
                 tv.setBackgroundResource(R.drawable.bg_today)
-                tv.setTextColor(getColor(android.R.color.white))
+                tv.setTextColor(todayTextColor)
             } else {
                 tv.background = null
-                tv.setTextColor(getColor(android.R.color.black))
+                tv.setTextColor(defaultTextColor)
             }
         }
     }
@@ -404,7 +540,13 @@ class HomeActivity : BaseActivity() {
                     .sessionsByDay(start, end)
             }
 
-            val visible = if (isHr) sessions else sessions.filter { it.userId == userId }
+            // Фильтрация по членству:
+            // - HR видит только смены активных сотрудников
+            // - обычный пользователь видит свои смены только если активен
+            val visible = when {
+                isHr -> sessions.filter { it.userId in activeUserIds }
+                else -> if (isEmployeeActive) sessions.filter { it.userId == userId } else emptyList()
+            }
 
             val summaries = visible
                 .filter { it.endTime != null }
@@ -566,6 +708,12 @@ class HomeActivity : BaseActivity() {
     private fun parseOfficeId(qr: String): String? {
         val trimmed = qr.trim()
         return if (trimmed.isEmpty()) null else trimmed
+    }
+
+    // Обновление календаря при изменении членства/списка сотрудников
+    private fun refreshCalendarForMembershipChange() {
+        val day = if (selectedDayMillis != 0L) selectedDayMillis else Calendar.getInstance().timeInMillis
+        loadSessionsForDay(day)
     }
 
     private data class SimpleUser(

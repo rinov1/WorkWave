@@ -67,8 +67,7 @@ class ProfileActivity : BaseActivity() {
             }
         }
 
-        binding.toolbar.menu.findItem(R.id.action_edit)?.isVisible =
-            canEditProfile
+        binding.toolbar.menu.findItem(R.id.action_edit)?.isVisible = canEditProfile
 
         binding.ivAvatar.setOnClickListener {
             if (editMode && canEditProfile) pickImage.launch("image/*")
@@ -79,9 +78,7 @@ class ProfileActivity : BaseActivity() {
         }
 
         binding.btnLogout.visibility = if (isOwnProfile) View.VISIBLE else View.GONE
-        binding.btnLogout.setOnClickListener {
-            logout()
-        }
+        binding.btnLogout.setOnClickListener { logout() }
 
         lifecycleScope.launch { loadData() }
     }
@@ -108,8 +105,7 @@ class ProfileActivity : BaseActivity() {
     private fun fillUi() {
         val e = employee ?: return
 
-        val fullName =
-            listOfNotNull(e.firstName, e.lastName).joinToString(" ").ifEmpty { "-" }
+        val fullName = listOfNotNull(e.firstName, e.lastName).joinToString(" ").ifEmpty { "-" }
         binding.tvFullName.text = fullName
 
         binding.tvPhone.text = e.phone ?: "-"
@@ -166,15 +162,11 @@ class ProfileActivity : BaseActivity() {
         binding.tvFullName.visibility = if (enabled) View.GONE else View.VISIBLE
         binding.groupEditName.visibility = if (enabled) View.VISIBLE else View.GONE
 
-        binding.tvPhone.visibility =
-            if (enabled) View.GONE else View.VISIBLE
-        binding.tilPhone.visibility =
-            if (enabled) View.VISIBLE else View.GONE
+        binding.tvPhone.visibility = if (enabled) View.GONE else View.VISIBLE
+        binding.tilPhone.visibility = if (enabled) View.VISIBLE else View.GONE
 
-        binding.tvEmail.visibility =
-            if (enabled) View.GONE else View.VISIBLE
-        binding.tilEmail.visibility =
-            if (enabled) View.VISIBLE else View.GONE
+        binding.tvEmail.visibility = if (enabled) View.GONE else View.VISIBLE
+        binding.tilEmail.visibility = if (enabled) View.VISIBLE else View.GONE
 
         if (isHr) {
             if (enabled) {
@@ -225,8 +217,7 @@ class ProfileActivity : BaseActivity() {
         )
 
         if (isHr) {
-            val posText =
-                binding.tilPosition.editText?.text?.toString()?.trim().orEmpty()
+            val posText = binding.tilPosition.editText?.text?.toString()?.trim().orEmpty()
             updated = updated.copy(
                 position = posText.ifEmpty { null },
                 onVacation = binding.swVacation.isChecked
@@ -240,7 +231,11 @@ class ProfileActivity : BaseActivity() {
                     .insertOrUpdate(updated)
             }
             employee = updated
-            FirebaseEmployees.upsertEmployee(updated)
+
+            // Важно: не ре-активируем сотрудника при изменении профиля.
+            // Обновляем только документ в "users".
+            FirebaseEmployees.updateUserFields(updated)
+
             hasChanges = true
             setResult(RESULT_OK)
             fillUi()

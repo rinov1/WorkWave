@@ -5,6 +5,7 @@ import android.util.Patterns
 import android.content.Intent
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
+import com.workwave.workwave.R
 import com.workwave.workwave.data.AppDatabase
 import com.workwave.workwave.data.EmployeeEntity
 import com.workwave.workwave.data.UserEntity
@@ -43,11 +44,11 @@ class RegisterActivity : BaseActivity() {
         binding.tilPassword.error = null
 
         if (!Patterns.EMAIL_ADDRESS.matcher(emailRaw).matches()) {
-            binding.tilEmail.error = "Некорректная почта"
+            binding.tilEmail.error = getString(R.string.login_error_invalid_email)
             return
         }
         if (password.length < 6) {
-            binding.tilPassword.error = "Минимум 6 символов"
+            binding.tilPassword.error = getString(R.string.reg_error_password_short)
             return
         }
 
@@ -62,7 +63,7 @@ class RegisterActivity : BaseActivity() {
             if (existing != null) {
                 Snackbar.make(
                     binding.root,
-                    "Пользователь с такой почтой уже существует",
+                    getString(R.string.reg_error_user_exists),
                     Snackbar.LENGTH_LONG
                 ).show()
                 return@launch

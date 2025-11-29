@@ -8,7 +8,7 @@
     android:layout_height="match_parent">
 
     <TextView
-        android:text="WorkWave"
+        android:text="@string/app_name"
         android:textSize="24sp"
         android:textStyle="bold"
         android:layout_marginBottom="24dp"
@@ -17,7 +17,7 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnOpenLogin"
-        android:text="вход"
+        android:text="@string/btn_login"
         android:textColor="@android:color/black"
         android:background="@drawable/bg_btn_white_15dp"
         app:backgroundTint="@null"
@@ -27,7 +27,7 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnOpenRegister"
         style="@style/WorkWave.BlueRoundedButton"
-        android:text="регистрация"
+        android:text="@string/btn_register"
         android:layout_marginTop="12dp"
         android:layout_width="300dp"
         android:layout_height="wrap_content"/>

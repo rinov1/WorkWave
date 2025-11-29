@@ -8,7 +8,7 @@
     android:layout_height="match_parent">
 
     <TextView
-        android:text="WorkWave"
+        android:text="@string/app_name"
         android:textSize="24sp"
         android:textStyle="bold"
         android:layout_marginBottom="24dp"
@@ -25,7 +25,7 @@
         app:boxCornerRadiusBottomEnd="14dp">
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etEmail"
-            android:hint="почта"
+            android:hint="@string/hint_email"
             android:inputType="textEmailAddress"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>
@@ -43,7 +43,7 @@
         app:endIconMode="password_toggle">
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etPassword"
-            android:hint="пароль"
+            android:hint="@string/hint_password"
             android:inputType="textPassword"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>
@@ -51,7 +51,7 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnRegister"
-        android:text="зарегистрироваться"
+        android:text="@string/btn_register"
         style="@style/WorkWave.BlueRoundedButton"
         android:layout_marginTop="16dp"
         android:layout_width="300dp"
@@ -59,7 +59,7 @@
 
     <TextView
         android:id="@+id/tvAlready"
-        android:text="уже есть аккаунт? войти"
+        android:text="@string/reg_already_have_account"
         android:layout_marginTop="12dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>

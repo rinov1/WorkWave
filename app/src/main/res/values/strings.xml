@@ -84,4 +84,11 @@
     <string name="login_user_not_found">Пользователь не найден. Зарегистрируйтесь.</string>
     <string name="login_wrong_password">Неверный пароль</string>
 
+    <string name="reg_already_have_account">Уже есть аккаунт? Войти</string>
+    <string name="reg_error_password_short">Минимум 6 символов</string>
+    <string name="reg_error_user_exists">Пользователь с такой почтой уже существует</string>
+
+    <string name="emp_you_were_removed">Вы были удалены</string>
+    <string name="emp_you_were_added">Вы были добавлены</string>
+
 </resources>

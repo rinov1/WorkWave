@@ -7,12 +7,48 @@
     android:orientation="vertical"
     android:padding="16dp">
 
+    <!-- Кнопки сортировки остаются сверху -->
+    <LinearLayout
+        android:id="@+id/sortButtonsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSortName"
+            style="@style/WorkWave.BlueRoundedButton"
+            android:text="А‑Я"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSortDate"
+            style="@style/WorkWave.BlueRoundedButton"
+            android:text="Дата"
+            android:layout_marginStart="12dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <!-- Список занимает всё оставшееся пространство -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvEmployees"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginBottom="8dp"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+    <!-- Кнопки HR перенесены вниз -->
     <LinearLayout
         android:id="@+id/hrButtonsContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:gravity="center_horizontal"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp">
 
         <com.google.android.material.button.MaterialButton
@@ -30,12 +66,5 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
     </LinearLayout>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvEmployees"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
 </LinearLayout>
